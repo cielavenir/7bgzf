@@ -1,3 +1,6 @@
+// based on https://github.com/lh3/samtools/blob/master/razf.c:
+// Copyright 2008, Jue Ruan <ruanjue@gmail.com>, Heng Li <lh3@sanger.ac.uk> (2-clause BSDL)
+
 #ifdef STANDALONE
 #include <stdio.h>
 #include <string.h>
@@ -97,8 +100,6 @@ int filelength(int fd){ //constant phrase
 #include "../lib/zopfli/deflate.h"
 #include "../lib/lzma.h"
 #include "../lib/popt/popt.h"
-
-// https://github.com/lh3/samtools/blob/master/razf.c
 
 // gzip flag byte
 #define ASCII_FLAG   0x01 /* bit 0 set: file probably ascii text */
