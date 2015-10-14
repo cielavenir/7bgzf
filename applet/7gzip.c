@@ -1,3 +1,9 @@
+/*
+zlibrawstdio:  RFC 1950 (zlib)
+zlibrawstdio2: RFC 1951 (deflate)
+7gzip:         RFC 1952
+*/
+
 #include <stdio.h>
 #include <time.h>
 #include "../lib/zlib/zlib.h"
@@ -60,28 +66,29 @@ static int _compress(FILE *fin,FILE *fout,int level){
 			fwrite(buf,1,4,fout);
 			write32(buf,h.size);
 			fwrite(buf,1,4,fout);
-			fclose(fout);
+			fflush(fout);
 		}
 		lzmaClose7z();
 	}else{
 		char mode[]="wb0";
 		mode[2]+=level;
 		int readlen;
-		gzFile gz=gzdopen(fileno(fout),mode);
+		gzFile gz=gzdopen(dup(fileno(fout)),mode);
 		for(;(readlen=fread(buf,1,BUFLEN,stdin))>0;){
 			gzwrite(gz,buf,readlen);
 		}
-		gzflush(gz,Z_FINISH); //lol
+		gzclose(gz);
 	}
 	return 0;
 }
 
 static int _decompress(FILE *fin,FILE *fout){
 	int readlen;
-	gzFile gz=gzdopen(fileno(fin),"rb");
+	gzFile gz=gzdopen(dup(fileno(fin)),"rb");
 	for(;(readlen=gzread(gz,buf,BUFLEN))>0;){
 		fwrite(buf,1,readlen,fout);
 	}
+	gzclose(gz);
 	return 0;
 }
 
