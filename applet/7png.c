@@ -85,13 +85,17 @@ if(level>9){
 	fwrite(buf,1,8,out);
 
 	//iterate png chunks
+	bool cgbi=false;
+	unsigned int cgbiflg=0;
+	int bits=0,color=0,filter=0,width=0,height=0;
+
 	int tbl_last=0;
 	size_t compsize=0;
 	for(;;){
 		if(fread(buf,1,8,in)<8)break;
 		unsigned int len=read32be(buf);
 		unsigned int type=read32(buf+4);
-		if(level && type==fourcc('I','D','A','T')){
+		if((level||cgbi) && type==fourcc('I','D','A','T')){
 			//recompress
 			if(tbl_last==MAX_IDAT){
 				fprintf(stderr,"Sorry, IDAT is limited to %d.\n",MAX_IDAT);
@@ -104,7 +108,7 @@ if(level>9){
 			compsize+=len;
 			tbl_last++;
 			fread(buf,1,4,in);
-		}else if(level && type==fourcc('I','E','N','D')){
+		}else if((level||cgbi) && type==fourcc('I','E','N','D')){
 			fprintf(stderr,"compressed length=%d\n",compsize);
 			size_t bufsize=compsize + (compsize>>1);
 
@@ -116,9 +120,12 @@ if(level>9){
 				z.zfree = Z_NULL;
 				z.opaque = Z_NULL;
 
-				if(inflateInit(&z) != Z_OK){
-					fprintf(stderr,"inflateInit: %s\n", (z.msg) ? z.msg : "???");
-					return 1;
+				{
+					int x=cgbi?inflateInit2(&z,-MAX_WBITS):inflateInit(&z);
+					if(x != Z_OK){
+						fprintf(stderr,"inflateInit: %s\n", (z.msg) ? z.msg : "???");
+						return 1;
+					}
 				}
 
 				int i=0;
@@ -158,9 +165,12 @@ if(level>9){
 				z.zfree = Z_NULL;
 				z.opaque = Z_NULL;
 
-				if(inflateInit(&z) != Z_OK){
-					fprintf(stderr,"inflateInit: %s\n", (z.msg) ? z.msg : "???");
-					return 1;
+				{
+					int x=cgbi?inflateInit2(&z,-MAX_WBITS):inflateInit(&z);
+					if(x != Z_OK){
+						fprintf(stderr,"inflateInit: %s\n", (z.msg) ? z.msg : "???");
+						return 1;
+					}
 				}
 
 				int i=0;
@@ -180,6 +190,52 @@ if(level>9){
 				if(inflateEnd(&z) != Z_OK){
 					fprintf(stderr,"inflateEnd: %s\n", (z.msg) ? z.msg : "???");
 					return 2;
+				}
+			}
+
+			if(cgbi&&cgbiflg){
+				int i=1,j=0;
+				if(color==6){ //RGBA
+					if(bits==8){
+						for(;i<declen;i+=4){
+							__decompbuf[i]^=__decompbuf[i+2];
+							__decompbuf[i+2]^=__decompbuf[i];
+							__decompbuf[i]^=__decompbuf[i+2];
+							if(++j==width)j=0,++i;
+						}
+					}
+					if(bits==16){
+						for(;i<declen;i+=8){
+							__decompbuf[i+0]^=__decompbuf[i+4];
+							__decompbuf[i+4]^=__decompbuf[i+0];
+							__decompbuf[i+0]^=__decompbuf[i+4];
+							__decompbuf[i+1]^=__decompbuf[i+5];
+							__decompbuf[i+5]^=__decompbuf[i+1];
+							__decompbuf[i+1]^=__decompbuf[i+5];
+							if(++j==width)j=0,++i;
+						}
+					}
+				}
+				if(color==2){ //RGB
+					if(bits==8){
+						for(;i<declen;i+=3){
+							__decompbuf[i]^=__decompbuf[i+2];
+							__decompbuf[i+2]^=__decompbuf[i];
+							__decompbuf[i]^=__decompbuf[i+2];
+							if(++j==width)j=0,++i;
+						}
+					}
+					if(bits==16){
+						for(;i<declen;i+=6){
+							__decompbuf[i+0]^=__decompbuf[i+4];
+							__decompbuf[i+4]^=__decompbuf[i+0];
+							__decompbuf[i+0]^=__decompbuf[i+4];
+							__decompbuf[i+1]^=__decompbuf[i+5];
+							__decompbuf[i+5]^=__decompbuf[i+1];
+							__decompbuf[i+1]^=__decompbuf[i+5];
+							if(++j==width)j=0,++i;
+						}
+					}
 				}
 			}
 
@@ -267,12 +323,34 @@ if(level>9)free(COMPBUF);
 #endif
 		}else{
 			bool copy=!strip || type==fourcc('I','H','D','R') || type==fourcc('P','L','T','E') || type==fourcc('t','R','N','S') || type==fourcc('I','D','A','T') || type==fourcc('I','E','N','D');
+			if(type==fourcc('C','g','B','I')){
+				cgbi=true;
+				copy=false;
+			}
 			//copy
-			len+=4;
+			len+=4; //footer crc
 			if(copy)fwrite(buf,1,8,out);
 			for(;len;){
 				fread(buf,1,min(BUFLEN,len),in);
 				if(copy)fwrite(buf,1,min(BUFLEN,len),out);
+				if(type==fourcc('C','g','B','I')){
+					cgbiflg=read32be(buf); //use head 4 bytes
+					if(level==0 && cgbiflg){
+						fprintf(stderr,"CgBI RGBA<=>BGRA convertion is required; force recompression.\n");
+						level=2; //fixme
+					}
+				}
+				if(type==fourcc('I','H','D','R')){
+					width=read32be(buf);
+					height=read32be(buf+4);
+					bits=buf[8];
+					color=buf[9];
+					filter=buf[11];
+					if(cgbi && (buf[12]/*interlace*/ || (bits!=8&&bits!=16) || (color!=2&&color!=6))){
+						fprintf(stderr,"Sorry: CgBI RGBA<=>BGRA convertion is omitted because the routine is incomplete.\n");
+						cgbiflg=0;
+					}
+				}
 				len-=min(BUFLEN,len);
 			}
 		}
