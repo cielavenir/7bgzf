@@ -56,7 +56,7 @@ the updated crc. The crc should be initialized to zero.
 static unsigned int UpdateCRC(unsigned int crc,
                                const unsigned char *buf, size_t len) {
   unsigned int c = crc ^ 0xffffffffL;
-  unsigned n;
+  size_t n;
 
   if (!crc_table_computed)
     MakeCRCTable();
@@ -67,7 +67,7 @@ static unsigned int UpdateCRC(unsigned int crc,
 }
 
 /* Returns the CRC of the bytes buf[0..len-1]. */
-static unsigned int CRC(const unsigned char* buf, int len) {
+static unsigned int CRC(const unsigned char* buf, size_t len) {
   return UpdateCRC(0L, buf, len);
 }
 
