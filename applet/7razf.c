@@ -24,12 +24,12 @@ unsigned char __compbuf[COMPBUFLEN],__decompbuf[DECOMPBUFLEN];
 
 unsigned long long int read64(const void *p){
 	const unsigned char *x=(const unsigned char*)p;
-	return x[0]|(x[1]<<8)|(x[2]<<16)|(x[3]<<24)|( (unsigned long long int)(x[4]|(x[5]<<8)|(x[6]<<16)|(x[7]<<24)) <<32);
+	return x[0]|(x[1]<<8)|(x[2]<<16)|((unsigned int)x[3]<<24)|( (unsigned long long int)(x[4]|(x[5]<<8)|(x[6]<<16)|((unsigned int)x[7]<<24)) <<32);
 }
 
 unsigned int read32(const void *p){
 	const unsigned char *x=(const unsigned char*)p;
-	return x[0]|(x[1]<<8)|(x[2]<<16)|(x[3]<<24);
+	return x[0]|(x[1]<<8)|(x[2]<<16)|((unsigned int)x[3]<<24);
 }
 
 unsigned short read16(const void *p){
@@ -55,12 +55,12 @@ void write16(void *p, const unsigned short n){
 
 unsigned long long int read64be(const void *p){
 	const unsigned char *x=(const unsigned char*)p;
-	return x[7]|(x[6]<<8)|(x[5]<<16)|(x[4]<<24)|( (unsigned long long int)(x[3]|(x[2]<<8)|(x[1]<<16)|(x[0]<<24)) <<32);
+	return x[7]|(x[6]<<8)|(x[5]<<16)|((unsigned int)x[4]<<24)|( (unsigned long long int)(x[3]|(x[2]<<8)|(x[1]<<16)|((unsigned int)x[0]<<24)) <<32);
 }
 
 unsigned int read32be(const void *p){
 	const unsigned char *x=(const unsigned char*)p;
-	return x[3]|(x[2]<<8)|(x[1]<<16)|(x[0]<<24);
+	return x[3]|(x[2]<<8)|(x[1]<<16)|((unsigned int)x[0]<<24);
 }
 
 unsigned short read16be(const void *p){

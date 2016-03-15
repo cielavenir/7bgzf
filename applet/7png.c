@@ -28,7 +28,7 @@ unsigned char __compbuf[COMPBUFLEN],__decompbuf[DECOMPBUFLEN];
 
 unsigned int read32be(const void *p){
 	const unsigned char *x=(const unsigned char*)p;
-	return x[3]|(x[2]<<8)|(x[1]<<16)|(x[0]<<24);
+	return x[3]|(x[2]<<8)|(x[1]<<16)|((unsigned int)x[0]<<24);
 }
 void write32be(void *p, const unsigned int n){
 	unsigned char *x=(unsigned char*)p;
@@ -37,7 +37,7 @@ void write32be(void *p, const unsigned int n){
 
 unsigned int read32(const void *p){
 	const unsigned char *x=(const unsigned char*)p;
-	return x[0]|(x[1]<<8)|(x[2]<<16)|(x[3]<<24);
+	return x[0]|(x[1]<<8)|(x[2]<<16)|((unsigned int)x[3]<<24);
 }
 void write32(void *p, const unsigned int n){
 	unsigned char *x=(unsigned char*)p;

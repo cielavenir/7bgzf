@@ -16,7 +16,7 @@ unsigned char buf[BUFLEN];
 
 unsigned int read32(const void *p){
 	const unsigned char *x=(const unsigned char*)p;
-	return x[0]|(x[1]<<8)|(x[2]<<16)|(x[3]<<24);
+	return x[0]|(x[1]<<8)|(x[2]<<16)|((unsigned int)x[3]<<24);
 }
 void write32(void *p, const unsigned int n){
 	unsigned char *x=(unsigned char*)p;
@@ -73,22 +73,37 @@ static int _compress(FILE *fin,FILE *fout,int level){
 		char mode[]="wb0";
 		mode[2]+=level;
 		int readlen;
+#ifdef FEOS
+		gzFile gz=gzdopen(fileno(fout),mode);
+		for(;(readlen=fread(buf,1,BUFLEN,stdin))>0;){
+			gzwrite(gz,buf,readlen);
+		}
+		gzflush(gz,Z_FINISH);
+#else
 		gzFile gz=gzdopen(dup(fileno(fout)),mode);
 		for(;(readlen=fread(buf,1,BUFLEN,stdin))>0;){
 			gzwrite(gz,buf,readlen);
 		}
 		gzclose(gz);
+#endif
 	}
 	return 0;
 }
 
 static int _decompress(FILE *fin,FILE *fout){
 	int readlen;
+#ifdef FEOS
+	gzFile gz=gzdopen(fileno(fin),"rb");
+	for(;(readlen=gzread(gz,buf,BUFLEN))>0;){
+		fwrite(buf,1,readlen,fout);
+	}
+#else
 	gzFile gz=gzdopen(dup(fileno(fin)),"rb");
 	for(;(readlen=gzread(gz,buf,BUFLEN))>0;){
 		fwrite(buf,1,readlen,fout);
 	}
 	gzclose(gz);
+#endif
 	return 0;
 }
 
