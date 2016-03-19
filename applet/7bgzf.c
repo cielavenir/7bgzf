@@ -23,6 +23,10 @@ unsigned int read32(const void *p){
 	const unsigned char *x=(const unsigned char*)p;
 	return x[0]|(x[1]<<8)|(x[2]<<16)|((unsigned int)x[3]<<24);
 }
+unsigned short read16(const void *p){
+	const unsigned char *x=(const unsigned char*)p;
+	return x[0]|(x[1]<<8);
+}
 void write32(void *p, const unsigned int n){
 	unsigned char *x=(unsigned char*)p;
 	x[0]=n&0xff,x[1]=(n>>8)&0xff,x[2]=(n>>16)&0xff,x[3]=(n>>24)&0xff;
@@ -48,6 +52,45 @@ int filelength(int fd){ //constant phrase
 #include "../lib/zopfli/deflate.h"
 #include "../lib/lzma.h"
 #include "../lib/popt/popt.h"
+
+// gzip flag byte
+#define ASCII_FLAG   0x01 /* bit 0 set: file probably ascii text */
+#define HEAD_CRC     0x02 /* bit 1 set: header CRC present */
+#define EXTRA_FIELD  0x04 /* bit 2 set: extra field present */
+#define ORIG_NAME    0x08 /* bit 3 set: original file name present */
+#define COMMENT      0x10 /* bit 4 set: file comment present */
+#define RESERVED     0xE0 /* bits 5..7: reserved */
+
+static int _read_gz_header(unsigned char *data, int size, int *extra_off, int *extra_len, int *block_len){
+	int method, flags, n, len;
+	if(size < 2) return 0;
+	if(data[0] != 0x1f || data[1] != 0x8b) return 0;
+	if(size < 4) return 0;
+	method = data[2];
+	flags  = data[3];
+	if(method != Z_DEFLATED || (flags & RESERVED)) return 0;
+	n = 4 + 6; // Skip 6 bytes
+	*extra_off = n + 2;
+	*extra_len = 0;
+	if(flags & EXTRA_FIELD){
+		if(size < n + 2) return 0;
+		len = read16(data+n);
+		n += 2;
+		*extra_off = n;
+		if(len!=6 || memcmp(data+n,"BC\x02\x00",4))return 0;
+		n += 4;
+		*block_len = read16(data+n);
+		n += 2;
+		*extra_len = n - (*extra_off);
+	}
+	if(flags & ORIG_NAME) while(n < size && data[n++]);
+	if(flags & COMMENT) while(n < size && data[n++]);
+	if(flags & HEAD_CRC){
+		if(n + 2 > size) return 0;
+		n += 2;
+	}
+	return n;
+}
 
 static int _compress(FILE *in, FILE *out, int level){
 	int block_size=65536-4096;
@@ -138,6 +181,75 @@ if(level>9)free(COMPBUF);
 	return 0;
 }
 
+static int _decompress(FILE *in, FILE *out){
+	const int block_size=65536;
+	int readlen,i=0;
+	long long npos=0;
+
+	//void* coder=NULL;
+	//lzmaCreateCoder(&coder,0x040108,0,0);
+	for(;(readlen=fread(buf,1,1024,in))>0;i++){ //there shouldn't be two blocks within 1024bytes...
+		int extra_off, extra_len, block_len;
+		int n=_read_gz_header(buf,1024,&extra_off,&extra_len,&block_len);
+		if(!n){
+			fprintf(stderr,"not BGZF or corrupted\n");
+			return -1;
+		}
+		block_len+=1;
+		memmove(buf,buf+n,readlen-n); //ignore header
+		fread(buf+readlen-n,1,block_len-readlen,in);
+		npos+=block_len;
+		{
+			size_t decompsize=block_size;
+//if(coder){
+//		int r=lzmaCodeOneshot(coder,buf,block_len-n,__decompbuf,&decompsize);
+//		if(r){
+//			fprintf(stderr,"NDeflate::CCoder::Code %d\n",r);
+//			return 1;
+//		}
+//}else
+{
+			z_stream z;
+			int status=Z_OK;
+
+			z.zalloc = Z_NULL;
+			z.zfree = Z_NULL;
+			z.opaque = Z_NULL;
+
+			if(inflateInit2(&z,-MAX_WBITS) != Z_OK){
+				fprintf(stderr,"inflateInit: %s\n", (z.msg) ? z.msg : "???");
+				return 1;
+			}
+
+			z.next_in = buf;
+			z.avail_in = block_len-n;
+			z.next_out = __decompbuf;
+			z.avail_out = decompsize;
+
+		for(;z.avail_out && status != Z_STREAM_END;){
+			status = inflate(&z, Z_BLOCK);
+			if(status==Z_BUF_ERROR)break;
+			if(status != Z_STREAM_END && status != Z_OK){
+				fprintf(stderr,"inflate: %s\n", (z.msg) ? z.msg : "???");
+				return 10;
+			}
+		}
+
+			if(inflateEnd(&z) != Z_OK){
+				fprintf(stderr,"inflateEnd: %s\n", (z.msg) ? z.msg : "???");
+				return 2;
+			}
+			decompsize=block_size-z.avail_out;
+}
+			fwrite(__decompbuf,1,decompsize,out);
+		}
+		if((i+1)%256==0)fprintf(stderr,"%d\r",i+1);
+	}
+	fprintf(stderr,"%d done.\n",i);
+	//lzmaDestroyCoder(&coder);
+	return 0;
+}
+
 #ifdef STANDALONE
 int main(const int argc, const char **argv){
 #else
@@ -154,12 +266,12 @@ int _7bgzf(const int argc, const char **argv){
 		{ "compress",   'c',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, &level,       'c',     "1-9 (default 2) 7zip (fallback to zlib if 7z.dll/so isn't available)", "level" },
 		{ "zopfli",     'z',         POPT_ARG_INT, &zopfli,    0,       "zopfli", "numiterations" },
 		//{ "threshold",  't',         POPT_ARG_INT, &threshold, 0,       "compression threshold (in %, 10-100)", "threshold" },
-		//{ "decompress", 'd',         0,            &mode,      0,       "decompress", NULL },
+		{ "decompress", 'd',         0,            &mode,      0,       "decompress", NULL },
 		POPT_AUTOHELP,
 		POPT_TABLEEND,
 	};
 	optCon = poptGetContext(argv[0], argc, argv, optionsTable, 0);
-	poptSetOtherOptionHelp(optCon, "-c2/-z1 < dec.bin > enc.bgz (for decompression use 7gzip)");
+	poptSetOtherOptionHelp(optCon, "-c2/-z1 < dec.bin > enc.bgz or -d < enc.bgz > dec.bin");
 
 	for(;(optc=poptGetNextOpt(optCon))>=0;){
 		switch(optc){
@@ -187,11 +299,11 @@ int _7bgzf(const int argc, const char **argv){
 	}
 
 	if(mode){
-		//if(isatty(fileno(stdin))||isatty(fileno(stdout)))
-		//	{poptPrintHelp(optCon, stderr, 0);poptFreeContext(optCon);return -1;}
-		//poptFreeContext(optCon);
+		if(isatty(fileno(stdin))||isatty(fileno(stdout)))
+			{poptPrintHelp(optCon, stderr, 0);poptFreeContext(optCon);return -1;}
+		poptFreeContext(optCon);
 		//lzmaOpen7z();
-		int ret=-1;//_decompress(stdin,stdout);
+		int ret=_decompress(stdin,stdout);
 		//lzmaClose7z();
 		return ret;
 	}else{

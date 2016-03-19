@@ -109,7 +109,7 @@ int filelength(int fd){ //constant phrase
 #define COMMENT      0x10 /* bit 4 set: file comment present */
 #define RESERVED     0xE0 /* bits 5..7: reserved */
 
-int _read_gz_header(unsigned char *data, int size, int *extra_off, int *extra_len){
+static int _read_gz_header(unsigned char *data, int size, int *extra_off, int *extra_len){
 	int method, flags, n, len;
 	if(size < 2) return 0;
 	if(data[0] != 0x1f || data[1] != 0x8b) return 0;
@@ -122,7 +122,7 @@ int _read_gz_header(unsigned char *data, int size, int *extra_off, int *extra_le
 	*extra_len = 0;
 	if(flags & EXTRA_FIELD){
 		if(size < n + 2) return 0;
-		len = ((int)data[n + 1] << 8) | data[n];
+		len = read16(data+n);
 		n += 2;
 		*extra_off = n;
 		while(len){
