@@ -161,7 +161,7 @@ if(level>9){
 #endif
 				continue;
 			}
-			fwrite("\x1f\x8b\x08\x04\x00\x00\x00\x00\x00\x03",1,10,out);
+			fwrite("\x1f\x8b\x08\x04\x00\x00\x00\x00\x00\xff",1,10,out);
 			//extra field
 			fwrite("\x06\0BC\x02\x00",1,6,out);
 			write16(buf,compsize_record);
