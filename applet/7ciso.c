@@ -10,6 +10,7 @@ typedef unsigned short u16;
 typedef unsigned int   u32;
 typedef unsigned long long int u64;
 #define align2p(p,i) (((i)+((p)-1))&~((p)-1))
+#define LLD "lld"
 
 #define BUFLEN (1<<22)
 unsigned char buf[BUFLEN];
@@ -30,11 +31,13 @@ void write32(void *p, const unsigned int n){
 
 #if defined(WIN32) || (!defined(__GNUC__) && !defined(__clang__))
 #else
-int filelength(int fd){ //constant phrase
+//constant phrase
+long long filelengthi64(int fd){
 	struct stat st;
 	fstat(fd,&st);
 	return st.st_size;
 }
+int filelength(int fd){return filelengthi64(fd);}
 #endif
 
 #else
@@ -61,12 +64,12 @@ static int _compress(FILE *in, FILE *out, int level, int threshold){ //align not
 	memset(&header,0,sizeof(header));
 	memcpy(header.magic,"CISO",4);
 	header.header_size=sizeof(header);
-	header.total_bytes=filelength(fileno(in));
+	header.total_bytes=filelengthi64(fileno(in));
 	header.block_size=2048;
 	header.ver=1;
 	header.align=0;
 
-	int total_block=align2p(header.block_size,header.total_bytes)/header.block_size;
+	long long total_block=align2p(header.block_size,header.total_bytes)/header.block_size;
 	memset(buf,0,4*(total_block+1));
 	fwrite(&header,1,sizeof(header),out);
 	fwrite(buf,1,4*(total_block+1),out);
@@ -79,7 +82,7 @@ if(level>9){
 #endif
 	void* coder=NULL;
 	lzmaCreateCoder(&coder,0x040108,1,level);
-	int i=0;
+	long long i=0;
 	for(;i<total_block;i++){
 		write32(buf+4*i,ftell(out));
 		size_t readlen=fread(__decompbuf,1,header.block_size,in);
@@ -141,12 +144,12 @@ if(coder){
 #ifndef FEOS
 if(level>9)free(COMPBUF);
 #endif
-		if((i+1)%256==0)fprintf(stderr,"%d / %d\r",i+1,total_block);
+		if((i+1)%256==0)fprintf(stderr,"%"LLD" / %"LLD"\r",i+1,total_block);
 	}
 	write32(buf+4*i,ftell(out));
 	fseek(out,sizeof(header),SEEK_SET);
 	fwrite(buf,1,4*(total_block+1),out);
-	fprintf(stderr,"%d / %d done.\n",i,total_block);
+	fprintf(stderr,"%"LLD" / %"LLD" done.\n",i,total_block);
 	lzmaDestroyCoder(&coder);
 	return 0;
 }

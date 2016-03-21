@@ -13,6 +13,7 @@ typedef unsigned short u16;
 typedef unsigned int   u32;
 typedef unsigned long long int u64;
 #define align2p(p,i) (((i)+((p)-1))&~((p)-1))
+#define LLD "lld"
 
 #define BUFLEN (1<<22)
 unsigned char buf[BUFLEN];
@@ -86,11 +87,13 @@ void write16be(void *p, const unsigned short n){
 
 #if defined(WIN32) || (!defined(__GNUC__) && !defined(__clang__))
 #else
-int filelength(int fd){ //constant phrase
+//constant phrase
+long long filelengthi64(int fd){
 	struct stat st;
 	fstat(fd,&st);
 	return st.st_size;
 }
+int filelength(int fd){return filelengthi64(fd);}
 #endif
 
 #else
@@ -146,11 +149,11 @@ static int _compress(FILE *in, FILE *out, int level){
 	//extra field
 	fwrite("\x07\0RAZF\x01\x80\x00",1,9,out);
 
-	int block_size=32768;
-	int total_bytes=filelength(fileno(in));
-	int total_block=align2p(block_size,total_bytes)/block_size - 1;
-	int binsize=(1LLU << 32)/block_size;
-	int bins=total_block/binsize;
+	const int block_size=32768;
+	long long total_bytes=filelengthi64(fileno(in));
+	long long total_block=align2p(block_size,total_bytes)/block_size - 1;
+	const int binsize=(1LLU << 32)/block_size;
+	long long bins=total_block/binsize;
 	memset(buf,0,4+8*(bins+1)+4*total_block);
 	write32be(buf,total_block);
 	unsigned int crc=0;
@@ -165,7 +168,7 @@ if(level>9){
 #endif
 	void* coder=NULL;
 	lzmaCreateCoder(&coder,0x040108,1,level);
-	int i=-1;
+	long long i=-1;
 	for(;i<total_block;i++){
 		if(i%binsize==0)write64be(buf+4+8*(i/binsize),pos);
 		if(i>=0)write32be(buf+4+8*(bins+1)+4*i,pos-read64be(buf+4+8*(i/binsize)));
@@ -256,7 +259,7 @@ if(coder){
 #ifndef FEOS
 if(level>9)free(COMPBUF);
 #endif
-		if((i+1)%256==0)fprintf(stderr,"%d / %d\r",i+1,total_block);
+		if((i+1)%256==0)fprintf(stderr,"%"LLD" / %"LLD"\r",i+1,total_block);
 	}
 	fwrite(&crc,1,4,out);
 	fwrite(&total_bytes,1,4,out);
@@ -266,7 +269,7 @@ if(level>9)free(COMPBUF);
 	write64be(buf,total_bytes);
 	write64be(buf+8,block_offset);
 	fwrite(buf,1,16,out);
-	fprintf(stderr,"%d / %d done.\n",i,total_block);
+	fprintf(stderr,"%"LLD" / %"LLD" done.\n",i,total_block);
 	lzmaDestroyCoder(&coder);
 	return 0;
 }

@@ -36,15 +36,6 @@ void write16(void *p, const unsigned short n){
 	x[0]=n&0xff,x[1]=(n>>8)&0xff;
 }
 
-#if defined(WIN32) || (!defined(__GNUC__) && !defined(__clang__))
-#else
-int filelength(int fd){ //constant phrase
-	struct stat st;
-	fstat(fd,&st);
-	return st.st_size;
-}
-#endif
-
 #else
 #include "../cielbox.h"
 #endif
@@ -93,7 +84,7 @@ static int _read_gz_header(unsigned char *data, int size, int *extra_off, int *e
 }
 
 static int _compress(FILE *in, FILE *out, int level){
-	int block_size=65536-4096;
+	const int block_size=65536;
 
 #ifndef FEOS
 	ZopfliOptions options;
@@ -104,76 +95,89 @@ if(level>9){
 #endif
 	void* coder=NULL;
 	lzmaCreateCoder(&coder,0x040108,1,level);
-	int i=0;
+	int i=0,offset=0;
 	for(;/*i<total_block*/;i++){
-		unsigned int crc=0;
-		size_t readlen=fread(__decompbuf,1,block_size,in);
-		if(readlen==0 || readlen==-1)break;
-		crc=crc32(crc,__decompbuf,readlen);
-		size_t compsize=0;
-		unsigned char* COMPBUF = __compbuf;
+		size_t readlen=fread(__decompbuf+offset,1,block_size-offset,in);
+		if(readlen==-1)break;
+		readlen+=offset;
+		if(readlen==0)break;
+		size_t blksize=readlen;
+		for(;;){
+			size_t compsize=0;
+			unsigned char* COMPBUF = __compbuf;
 #ifndef FEOS
-if(level>9){
-		size_t __compsize=0;
-		unsigned char bp = 0;
-		COMPBUF=NULL;
-		ZopfliDeflate(&options, 2 /* Dynamic block */, 1, __decompbuf, (size_t)readlen, &bp, &COMPBUF, &__compsize);
-		compsize=__compsize;
-}else
+			if(level>9){
+				size_t __compsize=0;
+				unsigned char bp = 0;
+				COMPBUF=NULL;
+				ZopfliDeflate(&options, 2 /* Dynamic block */, 1, __decompbuf, (size_t)blksize, &bp, &COMPBUF, &__compsize);
+				compsize=__compsize;
+			}else
 #endif
-if(coder){
-		compsize=COMPBUFLEN;
-		int r=lzmaCodeOneshot(coder,__decompbuf,readlen,COMPBUF,&compsize);
-		if(r){
-			fprintf(stderr,"NDeflate::CCoder::Code %d\n",r);
-			return 1;
-		}
-}else{
-		z_stream z;
-		int status;
-		//int flush=Z_NO_FLUSH;
+			if(coder){
+				compsize=COMPBUFLEN;
+				int r=lzmaCodeOneshot(coder,__decompbuf,blksize,COMPBUF,&compsize);
+				if(r){
+					fprintf(stderr,"NDeflate::CCoder::Code %d\n",r);
+					return 1;
+				}
+			}else{
+				z_stream z;
+				int status;
+				//int flush=Z_NO_FLUSH;
 
-		z.zalloc = Z_NULL;
-		z.zfree = Z_NULL;
-		z.opaque = Z_NULL;
+				z.zalloc = Z_NULL;
+				z.zfree = Z_NULL;
+				z.opaque = Z_NULL;
 
-		if(deflateInit2(&z, level , Z_DEFLATED, -MAX_WBITS, level, Z_DEFAULT_STRATEGY) != Z_OK){
-			fprintf(stderr,"deflateInit: %s\n", (z.msg) ? z.msg : "???");
-			return 1;
-		}
+				if(deflateInit2(&z, level , Z_DEFLATED, -MAX_WBITS, level, Z_DEFAULT_STRATEGY) != Z_OK){
+					fprintf(stderr,"deflateInit: %s\n", (z.msg) ? z.msg : "???");
+					return 1;
+				}
 
-		z.next_in = __decompbuf;
-		z.avail_in = readlen;
-		z.next_out = __compbuf;
-		z.avail_out = COMPBUFLEN;
+				z.next_in = __decompbuf;
+				z.avail_in = blksize;
+				z.next_out = __compbuf;
+				z.avail_out = COMPBUFLEN;
 
-		status = deflate(&z, Z_FINISH);
-		if(status != Z_STREAM_END && status != Z_OK){
-			fprintf(stderr,"deflate: %s\n", (z.msg) ? z.msg : "???");
-			return 10;
-		}
-		compsize=COMPBUFLEN-z.avail_out;
+				status = deflate(&z, Z_FINISH);
+				if(status != Z_STREAM_END && status != Z_OK){
+					fprintf(stderr,"deflate: %s\n", (z.msg) ? z.msg : "???");
+					return 10;
+				}
+				compsize=COMPBUFLEN-z.avail_out;
 
-		if(deflateEnd(&z) != Z_OK){
-			fprintf(stderr,"deflateEnd: %s\n", (z.msg) ? z.msg : "???");
-			return 2;
-		}
-}
-		fwrite("\x1f\x8b\x08\x04\x00\x00\x00\x00\x00\x03",1,10,out);
-		//extra field
-		fwrite("\x06\0BC\x02\x00",1,6,out);
-		size_t compsize_record=18+compsize+8-1; // <=65535
-		write16(buf,compsize_record);
-		fwrite(buf,1,2,out);
-		fwrite(COMPBUF,1,compsize,out);
-		write32(buf,crc);
-		write32(buf+4,readlen);
-		fwrite(buf,1,8,out);
+				if(deflateEnd(&z) != Z_OK){
+					fprintf(stderr,"deflateEnd: %s\n", (z.msg) ? z.msg : "???");
+					return 2;
+				}
+			}
 
-
+			size_t compsize_record=18+compsize+8-1;
+			if(compsize_record>65535){
+				blksize-=1024;
 #ifndef FEOS
-if(level>9)free(COMPBUF);
+				if(level>9)free(COMPBUF);
 #endif
+				continue;
+			}
+			fwrite("\x1f\x8b\x08\x04\x00\x00\x00\x00\x00\x03",1,10,out);
+			//extra field
+			fwrite("\x06\0BC\x02\x00",1,6,out);
+			write16(buf,compsize_record);
+			fwrite(buf,1,2,out);
+			fwrite(COMPBUF,1,compsize,out);
+			unsigned int crc=crc32(0,__decompbuf,blksize);
+			write32(buf,crc);
+			write32(buf+4,blksize);
+			fwrite(buf,1,8,out);
+			offset=readlen-blksize;
+			memmove(__decompbuf,__decompbuf+readlen-offset,offset);
+#ifndef FEOS
+			if(level>9)free(COMPBUF);
+#endif
+			break;
+		}
 		if((i+1)%64==0)fprintf(stderr,"%d\r",i+1);
 	}
 	fprintf(stderr,"%d done.\n",i);
@@ -184,7 +188,7 @@ if(level>9)free(COMPBUF);
 static int _decompress(FILE *in, FILE *out){
 	const int block_size=65536;
 	int readlen,i=0;
-	long long npos=0;
+	long long filepos=0,rawpos=0;
 
 	//void* coder=NULL;
 	//lzmaCreateCoder(&coder,0x040108,0,0);
@@ -198,7 +202,6 @@ static int _decompress(FILE *in, FILE *out){
 		block_len+=1;
 		memmove(buf,buf+n,readlen-n); //ignore header
 		fread(buf+readlen-n,1,block_len-readlen,in);
-		npos+=block_len;
 		{
 			size_t decompsize=block_size;
 //if(coder){
@@ -240,6 +243,10 @@ static int _decompress(FILE *in, FILE *out){
 				return 2;
 			}
 			decompsize=block_size-z.avail_out;
+
+			//fprintf(stderr,"%016llx %016llx\n",filepos,rawpos);
+			//rawpos+=decompsize;
+			//filepos+=block_len;
 }
 			fwrite(__decompbuf,1,decompsize,out);
 		}

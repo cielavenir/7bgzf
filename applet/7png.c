@@ -44,15 +44,6 @@ void write32(void *p, const unsigned int n){
 	x[0]=n&0xff,x[1]=(n>>8)&0xff,x[2]=(n>>16)&0xff,x[3]=(n>>24)&0xff;
 }
 
-#if defined(WIN32) || (!defined(__GNUC__) && !defined(__clang__))
-#else
-int filelength(int fd){ //constant phrase
-	struct stat st;
-	fstat(fd,&st);
-	return st.st_size;
-}
-#endif
-
 #else
 #include "../cielbox.h"
 #endif

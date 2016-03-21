@@ -35,11 +35,13 @@ void write32be(void *p, const unsigned int n){
 
 #if defined(WIN32) || (!defined(__GNUC__) && !defined(__clang__))
 #else
-int filelength(int fd){ //constant phrase
+//constant phrase
+long long filelengthi64(int fd){
 	struct stat st;
 	fstat(fd,&st);
 	return st.st_size;
 }
+int filelength(int fd){return filelengthi64(fd);}
 #endif
 
 #else
@@ -67,7 +69,7 @@ static int _compress(FILE *in, FILE *out, int level){
 	DAX_H header;
 	memset(&header,0,sizeof(header));
 	memcpy(header.magic,"DAX\0",4);
-	header.total_bytes=filelength(fileno(in));
+	header.total_bytes=filelengthi64(fileno(in)); //uint32? lol
 	header.ver=1;
 
 	int total_block=align2p(DAX_BLOCK_SIZE,header.total_bytes)/DAX_BLOCK_SIZE;
