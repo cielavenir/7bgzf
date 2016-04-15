@@ -4,15 +4,14 @@ zlibrawstdio2: RFC 1951 (deflate)
 7gzip:         RFC 1952
 */
 
+#include "../compat.h"
 #include <stdio.h>
 #include <time.h>
 #include "../lib/zlib/zlib.h"
 #include "../lib/lzma.h"
 
 #ifdef STANDALONE
-#define BUFLEN (1<<22)
 unsigned char buf[BUFLEN];
-#define cbuf ((char*)buf)
 
 unsigned int read32(const void *p){
 	const unsigned char *x=(const unsigned char*)p;
@@ -23,7 +22,6 @@ void write32(void *p, const unsigned int n){
 	x[0]=n&0xff,x[1]=(n>>8)&0xff,x[2]=(n>>16)&0xff,x[3]=(n>>24)&0xff;
 }
 #else
-#include "../compat.h"
 #include "../lib/xutil.h"
 #endif
 

@@ -4,6 +4,7 @@ zlibrawstdio2: RFC 1951 (deflate)
 7gzip:         RFC 1952
 */
 
+#include "../compat.h"
 #include <stdio.h>
 #include "../lib/zlib/zlib.h"
 #include "../lib/lzma.h"
@@ -19,7 +20,6 @@ void write32be(void *p, const unsigned int n){
 	x[3]=n&0xff,x[2]=(n>>8)&0xff,x[1]=(n>>16)&0xff,x[0]=(n>>24)&0xff;
 }
 #else
-#include "../compat.h"
 #include "../lib/xutil.h"
 extern unsigned char __compbuf[COMPBUFLEN],__decompbuf[DECOMPBUFLEN];
 #endif
@@ -59,7 +59,7 @@ static int _compress(FILE *fin,FILE *fout,int level){
 	z_stream z;
 	int status;
 	int flush=Z_NO_FLUSH;
-	//int filesize=filelength(fileno(fin));
+	//long long filesize=filelengthi64(fileno(fin));
 
 	z.zalloc = Z_NULL;
 	z.zfree = Z_NULL;
@@ -110,7 +110,7 @@ static int _compress(FILE *fin,FILE *fout,int level){
 static int _decompress(FILE *fin,FILE *fout){
 	z_stream z;
 	int status;
-	//int filesize=filelength(fileno(fin));
+	//long long filesize=filelengthi64(fileno(fin));
 
 	z.zalloc = Z_NULL;
 	z.zfree = Z_NULL;

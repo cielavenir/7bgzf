@@ -1,19 +1,12 @@
 #ifdef STANDALONE
+#include "../compat.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <sys/stat.h>
-#include <zlib.h>
-typedef unsigned char  u8;
-typedef unsigned short u16;
-typedef unsigned int   u32;
-typedef unsigned long long int u64;
-#define align2p(p,i) (((i)+((p)-1))&~((p)-1))
-
-#define BUFLEN (1<<22)
+#include "../lib/zlibutil.h"
 unsigned char buf[BUFLEN];
-#define cbuf ((char*)buf)
 
 #define DECOMPBUFLEN (1<<16)
 #define COMPBUFLEN   (DECOMPBUFLEN|(DECOMPBUFLEN>>1))
@@ -40,7 +33,6 @@ void write16(void *p, const unsigned short n){
 #include "../cielbox.h"
 #endif
 
-#include "../lib/zopfli/deflate.h"
 #include "../lib/lzma.h"
 #include "../lib/popt/popt.h"
 
@@ -83,16 +75,9 @@ static int _read_gz_header(unsigned char *data, int size, int *extra_off, int *e
 	return n;
 }
 
-static int _compress(FILE *in, FILE *out, int level){
+static int _compress(FILE *in, FILE *out, int level, int method){
 	const int block_size=65536;
 
-#ifndef FEOS
-	ZopfliOptions options;
-if(level>9){
-	ZopfliInitOptions(&options);
-	options.numiterations = level/10;
-}
-#endif
 	void* coder=NULL;
 	lzmaCreateCoder(&coder,0x040108,1,level);
 	int i=0,offset=0;
@@ -103,62 +88,55 @@ if(level>9){
 		if(readlen==0)break;
 		size_t blksize=readlen;
 		for(;;){
-			size_t compsize=0;
-			unsigned char* COMPBUF = __compbuf;
-#ifndef FEOS
-			if(level>9){
-				size_t __compsize=0;
-				unsigned char bp = 0;
-				COMPBUF=NULL;
-				ZopfliDeflate(&options, 2 /* Dynamic block */, 1, __decompbuf, (size_t)blksize, &bp, &COMPBUF, &__compsize);
-				compsize=__compsize;
-			}else
-#endif
-			if(coder){
-				compsize=COMPBUFLEN;
-				int r=lzmaCodeOneshot(coder,__decompbuf,blksize,COMPBUF,&compsize);
+			size_t compsize=COMPBUFLEN;
+			if(method==DEFLATE_ZLIB){
+				int r=zlib_deflate(__compbuf,&compsize,__decompbuf,blksize,level);
 				if(r){
-					fprintf(stderr,"NDeflate::CCoder::Code %d\n",r);
+					fprintf(stderr,"deflate %d\n",r);
 					return 1;
 				}
-			}else{
-				z_stream z;
-				int status;
-				//int flush=Z_NO_FLUSH;
-
-				z.zalloc = Z_NULL;
-				z.zfree = Z_NULL;
-				z.opaque = Z_NULL;
-
-				if(deflateInit2(&z, level , Z_DEFLATED, -MAX_WBITS, level, Z_DEFAULT_STRATEGY) != Z_OK){
-					fprintf(stderr,"deflateInit: %s\n", (z.msg) ? z.msg : "???");
+			}
+			if(method==DEFLATE_7ZIP){
+				if(coder){
+					int r=lzmaCodeOneshot(coder,__decompbuf,blksize,__compbuf,&compsize);
+					if(r){
+						fprintf(stderr,"NDeflate::CCoder::Code %d\n",r);
+						return 1;
+					}
+				}
+			}
+			if(method==DEFLATE_ZOPFLI){
+				int r=zopfli_deflate(__compbuf,&compsize,__decompbuf,blksize,level);
+				if(r){
+					fprintf(stderr,"zopfli_deflate %d\n",r);
 					return 1;
 				}
-
-				z.next_in = __decompbuf;
-				z.avail_in = blksize;
-				z.next_out = __compbuf;
-				z.avail_out = COMPBUFLEN;
-
-				status = deflate(&z, Z_FINISH);
-				if(status != Z_STREAM_END && status != Z_OK){
-					fprintf(stderr,"deflate: %s\n", (z.msg) ? z.msg : "???");
-					return 10;
+			}
+			if(method==DEFLATE_MINIZ){
+				int r=miniz_deflate(__compbuf,&compsize,__decompbuf,blksize,level);
+				if(r){
+					fprintf(stderr,"miniz_deflate %d\n",r);
+					return 1;
 				}
-				compsize=COMPBUFLEN-z.avail_out;
-
-				if(deflateEnd(&z) != Z_OK){
-					fprintf(stderr,"deflateEnd: %s\n", (z.msg) ? z.msg : "???");
-					return 2;
+			}
+			if(method==DEFLATE_SLZ){
+				int r=slz_deflate(__compbuf,&compsize,__decompbuf,blksize,level);
+				if(r){
+					fprintf(stderr,"slz_deflate %d\n",r);
+					return 1;
+				}
+			}
+			if(method==DEFLATE_LIBDEFLATE){
+				int r=libdeflate_deflate(__compbuf,&compsize,__decompbuf,blksize,level);
+				if(r){
+					fprintf(stderr,"libdeflate_deflate %d\n",r);
+					return 1;
 				}
 			}
 
 			size_t compsize_record=18+compsize+8-1;
 			if(compsize_record>65535){
 				blksize-=1024;
-#ifndef FEOS
-				if(level>9)free(COMPBUF);
-#endif
 				continue;
 			}
 			fwrite("\x1f\x8b\x08\x04\x00\x00\x00\x00\x00\xff",1,10,out);
@@ -166,16 +144,13 @@ if(level>9){
 			fwrite("\x06\0BC\x02\x00",1,6,out);
 			write16(buf,compsize_record);
 			fwrite(buf,1,2,out);
-			fwrite(COMPBUF,1,compsize,out);
+			fwrite(__compbuf,1,compsize,out);
 			unsigned int crc=crc32(0,__decompbuf,blksize);
 			write32(buf,crc);
 			write32(buf+4,blksize);
 			fwrite(buf,1,8,out);
 			offset=readlen-blksize;
 			memmove(__decompbuf,__decompbuf+readlen-offset,offset);
-#ifndef FEOS
-			if(level>9)free(COMPBUF);
-#endif
 			break;
 		}
 		if((i+1)%64==0)fprintf(stderr,"%d\r",i+1);
@@ -204,50 +179,17 @@ static int _decompress(FILE *in, FILE *out){
 		fread(buf+readlen-n,1,block_len-readlen,in);
 		{
 			size_t decompsize=block_size;
-//if(coder){
-//		int r=lzmaCodeOneshot(coder,buf,block_len-n,__decompbuf,&decompsize);
-//		if(r){
-//			fprintf(stderr,"NDeflate::CCoder::Code %d\n",r);
-//			return 1;
-//		}
-//}else
-{
-			z_stream z;
-			int status=Z_OK;
 
-			z.zalloc = Z_NULL;
-			z.zfree = Z_NULL;
-			z.opaque = Z_NULL;
-
-			if(inflateInit2(&z,-MAX_WBITS) != Z_OK){
-				fprintf(stderr,"inflateInit: %s\n", (z.msg) ? z.msg : "???");
+			int r=zlib_inflate(__decompbuf,&decompsize,buf,block_len-n);
+			if(r){
+				fprintf(stderr,"inflate %d\n",r);
 				return 1;
 			}
-
-			z.next_in = buf;
-			z.avail_in = block_len-n;
-			z.next_out = __decompbuf;
-			z.avail_out = decompsize;
-
-		for(;z.avail_out && status != Z_STREAM_END;){
-			status = inflate(&z, Z_BLOCK);
-			if(status==Z_BUF_ERROR)break;
-			if(status != Z_STREAM_END && status != Z_OK){
-				fprintf(stderr,"inflate: %s\n", (z.msg) ? z.msg : "???");
-				return 10;
-			}
-		}
-
-			if(inflateEnd(&z) != Z_OK){
-				fprintf(stderr,"inflateEnd: %s\n", (z.msg) ? z.msg : "???");
-				return 2;
-			}
-			decompsize=block_size-z.avail_out;
 
 			//fprintf(stderr,"%016llx %016llx\n",filepos,rawpos);
 			//rawpos+=decompsize;
 			//filepos+=block_len;
-}
+
 			fwrite(__decompbuf,1,decompsize,out);
 		}
 		if((i+1)%256==0)fprintf(stderr,"%d\r",i+1);
@@ -262,41 +204,69 @@ int main(const int argc, const char **argv){
 #else
 int _7bgzf(const int argc, const char **argv){
 #endif
-	int mode=0;
-	int level=0;
-	int zopfli=0;
+	int cmode=0,mode=0;
+	int zlib=0,sevenzip=0,zopfli=0,miniz=0,slz=0,libdeflate=0;
 	poptContext optCon;
 	int optc;
 
 	struct poptOption optionsTable[] = {
 		//{ "longname", "shortname", argInfo,      *arg,       int val, description, argment description}
-		{ "compress",   'c',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, &level,       'c',     "1-9 (default 2) 7zip (fallback to zlib if 7z.dll/so isn't available)", "level" },
-		{ "zopfli",     'z',         POPT_ARG_INT, &zopfli,    0,       "zopfli", "numiterations" },
+		{ "stdout", 'c',         0,            &cmode,      0,       "stdout (currently ignored; always output to stdout)", NULL },
+		{ "zlib",   'z',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, &zlib,       'z',     "1-9 (default 6) zlib", "level" },
+		{ "miniz",     'm',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, &miniz,    'm',       "1-2 (default 1) miniz", "level" },
+		{ "slz",     's',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, &slz,    's',       "1-1 (default 1) slz", "level" },
+		{ "libdeflate",     'l',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, &libdeflate,    'l',       "1-12 (default 6) libdeflate", "level" },
+		{ "7zip",     'S',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, &sevenzip,    'S',       "1-9 (default 2) 7zip", "level" },
+		{ "zopfli",     'Z',         POPT_ARG_INT, &zopfli,    0,       "zopfli", "numiterations" },
 		//{ "threshold",  't',         POPT_ARG_INT, &threshold, 0,       "compression threshold (in %, 10-100)", "threshold" },
 		{ "decompress", 'd',         0,            &mode,      0,       "decompress", NULL },
 		POPT_AUTOHELP,
 		POPT_TABLEEND,
 	};
 	optCon = poptGetContext(argv[0], argc, argv, optionsTable, 0);
-	poptSetOtherOptionHelp(optCon, "-c2/-z1 < dec.bin > enc.bgz or -d < enc.bgz > dec.bin");
+	poptSetOtherOptionHelp(optCon, "-cz9 < dec.bin > enc.bgz or -cd < enc.bgz > dec.bin");
 
 	for(;(optc=poptGetNextOpt(optCon))>=0;){
 		switch(optc){
-			case 'c':{
+			case 'z':{
 				char *arg=poptGetOptArg(optCon);
-				if(arg)level=strtol(arg,NULL,10);
-				else level=2;
+				if(arg)zlib=strtol(arg,NULL,10);
+				else zlib=6;
+				break;
+			}
+			case 'm':{
+				char *arg=poptGetOptArg(optCon);
+				if(arg)miniz=strtol(arg,NULL,10);
+				else miniz=1;
+				break;
+			}
+			case 's':{
+				char *arg=poptGetOptArg(optCon);
+				if(arg)slz=strtol(arg,NULL,10);
+				else slz=1;
+				break;
+			}
+			case 'l':{
+				char *arg=poptGetOptArg(optCon);
+				if(arg)libdeflate=strtol(arg,NULL,10);
+				else libdeflate=1;
+				break;
+			}
+			case 'S':{
+				char *arg=poptGetOptArg(optCon);
+				if(arg)sevenzip=strtol(arg,NULL,10);
+				else sevenzip=2;
 				break;
 			}
 		}
 	}
 
+	int level_sum=zlib+sevenzip+zopfli+miniz+slz+libdeflate;
 	if(
-		(optc<-1) ||
-		(!mode&&!level&&!zopfli) ||
-		(level&&zopfli) ||
-		(mode&&(level||zopfli)) ||
-		(level>9)
+		optc<-1 ||
+		(!mode&&!zlib&&!sevenzip&&!zopfli&&!miniz&&!slz&&!libdeflate) ||
+		(mode&&(zlib||sevenzip||zopfli||miniz||slz||libdeflate)) ||
+		(!mode&&(level_sum==zlib)+(level_sum==sevenzip)+(level_sum==zopfli)+(level_sum==miniz)+(level_sum==slz)+(level_sum==libdeflate)!=1)
 	){
 		poptPrintHelp(optCon, stderr, 0);
 		poptFreeContext(optCon);
@@ -318,14 +288,32 @@ int _7bgzf(const int argc, const char **argv){
 			{poptPrintHelp(optCon, stderr, 0);poptFreeContext(optCon);return -1;}
 		poptFreeContext(optCon);
 
-		if(zopfli)fprintf(stderr,"(zopfli numiterations %d)\n",zopfli);
-		else{
-			fprintf(stderr,"compression level = %d ",level);
-			if(!lzmaOpen7z())fprintf(stderr,"(7zip)\n");
-			else fprintf(stderr,"(zlib)\n");
+		fprintf(stderr,"compression level = %d ",level_sum);
+		int ret=0;
+		if(zlib){
+			fprintf(stderr,"(zlib)\n");
+			ret=_compress(stdin,stdout,zlib,DEFLATE_ZLIB);
+		}else if(sevenzip){
+			fprintf(stderr,"(7zip)\n");
+			if(lzmaOpen7z()){
+				fprintf(stderr,"7-zip is NOT available.\n");
+				return -1;
+			}
+			ret=_compress(stdin,stdout,sevenzip,DEFLATE_7ZIP);
+			lzmaClose7z();
+		}else if(zopfli){
+			fprintf(stderr,"(zopfli)\n");
+			ret=_compress(stdin,stdout,zopfli,DEFLATE_ZOPFLI);
+		}else if(miniz){
+			fprintf(stderr,"(miniz)\n");
+			ret=_compress(stdin,stdout,miniz,DEFLATE_MINIZ);
+		}else if(slz){
+			fprintf(stderr,"(slz)\n");
+			ret=_compress(stdin,stdout,slz,DEFLATE_SLZ);
+		}else if(libdeflate){
+			fprintf(stderr,"(libdeflate)\n");
+			ret=_compress(stdin,stdout,libdeflate,DEFLATE_LIBDEFLATE);
 		}
-		int ret=_compress(stdin,stdout,level+zopfli*10); //lol
-		lzmaClose7z();
 		return ret;
 	}
 }

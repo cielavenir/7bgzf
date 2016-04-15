@@ -5,7 +5,7 @@ typedef unsigned short u16;
 typedef unsigned int   u32;
 #include "memstream.h"
 
-#if defined(WIN32) || (!defined(__GNUC__) && !defined(__clang__))
+#if defined(_WIN32) || (!defined(__GNUC__) && !defined(__clang__))
 	#include <windows.h>
 	#include <basetyps.h>
 	//broken...
@@ -104,16 +104,18 @@ public:
 typedef HRESULT (WINAPI*funcCreateObject)(const GUID*,const GUID*,void**);
 static funcCreateObject pCreateArchiver,pCreateCoder;
 
-#if defined(WIN32) || (!defined(__GNUC__) && !defined(__clang__))
+#if defined(_WIN32) || (!defined(__GNUC__) && !defined(__clang__))
 	static HMODULE h7z=NULL;
 #else
 	static void *h7z=NULL;
 #endif
 
 int lzmaOpen7z(){
+	if(lzma7zAlive())return 0;
+
 	h7z=NULL;
 #ifndef NODLOPEN
-#if defined(WIN32) || (!defined(__GNUC__) && !defined(__clang__))
+#if defined(_WIN32) || (!defined(__GNUC__) && !defined(__clang__))
 	h7z=LoadLibraryA("7z.dll");
 #else
 	h7z=LoadLibraryA("/usr/lib/p7zip/7z.so"); //Generic
@@ -127,7 +129,7 @@ int lzmaOpen7z(){
 	if(!h7z)return 1;
 
 #ifndef NODLOPEN
-#if defined(WIN32) || (!defined(__GNUC__) && !defined(__clang__))
+#if defined(_WIN32) || (!defined(__GNUC__) && !defined(__clang__))
 	pCreateArchiver=(funcCreateObject)GetProcAddress(h7z,"CreateObject");
 	pCreateCoder=(funcCreateObject)GetProcAddress(h7z,"CreateObject");
 #else
@@ -253,6 +255,12 @@ int lzmaCreateCoder(void **coder,unsigned long long int id,int encode,int level)
 	ICompressSetCoderProperties *coderprop;
 	(*(ICompressCoder**)coder)->QueryInterface(IID_ICompressSetCoderProperties, (void**)&coderprop);
 
+#ifndef LZMA_SPECIAL_COMPRESSION_LEVEL
+	PROPID ID[]={NCoderPropID::kLevel};
+	PROPVARIANT VAR[]={{VT_UI4,0,0,0,{0}}};
+	VAR[0].ulVal=level;
+	coderprop->SetCoderProperties(ID,VAR,1);
+#else
 	//Deflate(64)
 	if(id==0x040108||id==0x040109){
 		//VT_UI4 NCoderPropID::kNumPasses
@@ -343,6 +351,7 @@ int lzmaCreateCoder(void **coder,unsigned long long int id,int encode,int level)
 		//VT_UI4 NCoderPropID::kBlockSize
 		//left blank intentionally.
 	}
+#endif
 
 	return 0;
 }

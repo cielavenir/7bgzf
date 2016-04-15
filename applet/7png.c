@@ -1,30 +1,16 @@
 #ifdef STANDALONE
+#include "../compat.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <sys/stat.h>
-#include <zlib.h>
-typedef unsigned char  u8;
-typedef unsigned short u16;
-typedef unsigned int   u32;
-typedef unsigned long long int u64;
-#define align2p(p,i) (((i)+((p)-1))&~((p)-1))
-
-#define BUFLEN (1<<22)
+#include "../lib/zlibutil.h"
 unsigned char buf[BUFLEN];
-#define cbuf ((char*)buf)
 
 #define DECOMPBUFLEN (1<<16)
 #define COMPBUFLEN   (DECOMPBUFLEN|(DECOMPBUFLEN>>1))
 unsigned char __compbuf[COMPBUFLEN],__decompbuf[DECOMPBUFLEN];
-
-#if !defined(__cplusplus) && !defined(min)
-#define min(a,b) ((a)<(b)?(a):(b))
-#define max(a,b) ((a)>(b)?(a):(b))
-#endif
-
-#define fourcc(a,b,c,d) ((u32)(a) | ((u32)(b)<<8) | ((u32)(c)<<16) | ((u32)(d)<<24))
 
 unsigned int read32be(const void *p){
 	const unsigned char *x=(const unsigned char*)p;
@@ -48,7 +34,6 @@ void write32(void *p, const unsigned int n){
 #include "../cielbox.h"
 #endif
 
-#include "../lib/zopfli/deflate.h"
 #include "../lib/lzma.h"
 #include "../lib/popt/popt.h"
 
@@ -56,15 +41,7 @@ void write32(void *p, const unsigned int n){
 static unsigned char* tbl[MAX_IDAT];
 static unsigned int tbl_size[MAX_IDAT];
 
-static int _compress(FILE *in, FILE *out, int level, bool strip){
-
-#ifndef FEOS
-	ZopfliOptions options;
-if(level>9){
-	ZopfliInitOptions(&options);
-	options.numiterations = level/10;
-}
-#endif
+static int _compress(FILE *in, FILE *out, int level, int method, bool strip){
 	void* coder=NULL;
 	lzmaCreateCoder(&coder,0x040108,1,level);
 
@@ -238,55 +215,53 @@ if(level>9){
 
 			unsigned int adler=1;
 			adler=adler32(adler,__decompbuf,declen);
-			compsize=0;
-			unsigned char* COMPBUF = __compbuf;
-#ifndef FEOS
-if(level>9){
-			size_t __compsize=0;
-			unsigned char bp = 0;
-			COMPBUF=NULL;
-			ZopfliDeflate(&options, 2 /* Dynamic block */, 1, __decompbuf, (size_t)declen, &bp, &COMPBUF, &__compsize);
-			compsize=__compsize;
-}else
-#endif
-if(coder){
 			compsize=bufsize;
-			int r=lzmaCodeOneshot(coder,__decompbuf,declen,COMPBUF,&compsize);
-			if(r){
-				fprintf(stderr,"NDeflate::CCoder::Code %d\n",r);
-				return 1;
+
+			if(method==DEFLATE_ZLIB){
+				int r=zlib_deflate(__compbuf,&compsize,__decompbuf,declen,level);
+				if(r){
+					fprintf(stderr,"deflate %d\n",r);
+					return 1;
+				}
 			}
-}else{
-			z_stream z;
-			int status;
-			//int flush=Z_NO_FLUSH;
-
-			z.zalloc = Z_NULL;
-			z.zfree = Z_NULL;
-			z.opaque = Z_NULL;
-
-			if(deflateInit2(&z, level , Z_DEFLATED, -MAX_WBITS, level, Z_DEFAULT_STRATEGY) != Z_OK){
-				fprintf(stderr,"deflateInit: %s\n", (z.msg) ? z.msg : "???");
-				return 1;
+			if(method==DEFLATE_7ZIP){
+				if(coder){
+					int r=lzmaCodeOneshot(coder,__decompbuf,declen,__compbuf,&compsize);
+					if(r){
+						fprintf(stderr,"NDeflate::CCoder::Code %d\n",r);
+						return 1;
+					}
+				}
+			}
+			if(method==DEFLATE_ZOPFLI){
+				int r=zopfli_deflate(__compbuf,&compsize,__decompbuf,declen,level);
+				if(r){
+					fprintf(stderr,"zopfli_deflate %d\n",r);
+					return 1;
+				}
+			}
+			if(method==DEFLATE_MINIZ){
+				int r=miniz_deflate(__compbuf,&compsize,__decompbuf,declen,level);
+				if(r){
+					fprintf(stderr,"miniz_deflate %d\n",r);
+					return 1;
+				}
+			}
+			if(method==DEFLATE_SLZ){
+				int r=slz_deflate(__compbuf,&compsize,__decompbuf,declen,level);
+				if(r){
+					fprintf(stderr,"slz_deflate %d\n",r);
+					return 1;
+				}
+			}
+			if(method==DEFLATE_LIBDEFLATE){
+				int r=libdeflate_deflate(__compbuf,&compsize,__decompbuf,declen,level);
+				if(r){
+					fprintf(stderr,"libdeflate_deflate %d\n",r);
+					return 1;
+				}
 			}
 
-			z.next_in = __decompbuf;
-			z.avail_in = declen;
-			z.next_out = __compbuf;
-			z.avail_out = bufsize;
-
-			status = deflate(&z, Z_FINISH);
-			if(status != Z_STREAM_END && status != Z_OK){
-				fprintf(stderr,"deflate: %s\n", (z.msg) ? z.msg : "???");
-				return 10;
-			}
-			compsize=bufsize-z.avail_out;
-
-			if(deflateEnd(&z) != Z_OK){
-				fprintf(stderr,"deflateEnd: %s\n", (z.msg) ? z.msg : "???");
-				return 2;
-			}
-}
 			write32be(buf,2+compsize+4);
 			unsigned int crc=0;
 			write32(buf+4,fourcc('I','D','A','T'));
@@ -296,8 +271,8 @@ if(coder){
 			buf[0]=0x78,buf[1]=0xda;
 			crc=crc32(crc,buf,2);
 			fwrite(buf,1,2,out);
-			crc=crc32(crc,COMPBUF,compsize);
-			fwrite(COMPBUF,1,compsize,out);
+			crc=crc32(crc,__compbuf,compsize);
+			fwrite(__compbuf,1,compsize,out);
 
 			write32be(buf,adler);
 			crc=crc32(crc,buf,4);
@@ -309,9 +284,6 @@ if(coder){
 			write32(buf+4,fourcc('I','E','N','D'));
 			write32be(buf+8,0xae426082);
 			fwrite(buf,1,12,out);
-#ifndef FEOS
-if(level>9)free(COMPBUF);
-#endif
 		}else{
 			bool copy=!strip || type==fourcc('I','H','D','R') || type==fourcc('P','L','T','E') || type==fourcc('t','R','N','S') || type==fourcc('I','D','A','T') || type==fourcc('I','E','N','D');
 			if(type==fourcc('C','g','B','I')){
@@ -356,64 +328,108 @@ int main(const int argc, const char **argv){
 #else
 int _7png(const int argc, const char **argv){
 #endif
-	int mode=0;
-	int level=-1;
-	int zopfli=0;
+	int cmode=0,mode=0;
+	int zlib=0,sevenzip=0,zopfli=0,miniz=0,slz=0,libdeflate=0;
 	poptContext optCon;
 	int optc;
 
 	struct poptOption optionsTable[] = {
 		//{ "longname", "shortname", argInfo,      *arg,       int val, description, argment description}
-		{ "compress",   'c',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, &level,       'c',     "1-9 (default 2) 7zip (fallback to zlib if 7z.dll/so isn't available)", "level" },
-		{ "zopfli",     'z',         POPT_ARG_INT, &zopfli,    0,       "zopfli", "numiterations" },
-		//{ "threshold",  't',         POPT_ARG_INT, &threshold, 0,       "compression threshold (in %, 10-100)", "threshold" },
-		{ "strip", 's',         0,            &mode,      0,       "strip", "strip unnecessary chunks" },
+		{ "stdout", 'c',         0,            &cmode,      0,       "stdout (currently ignored)", NULL },
+		{ "zlib",   'z',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, &zlib,       'z',     "1-9 (default 6) zlib", "level" },
+		{ "miniz",     'm',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, &miniz,    'm',       "1-2 (default 1) miniz", "level" },
+		{ "slz",     's',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, &slz,    's',       "1-1 (default 1) slz", "level" },
+		{ "libdeflate",     'l',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, &libdeflate,    'l',       "1-12 (default 6) libdeflate", "level" },
+		{ "7zip",     'S',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, &sevenzip,    'S',       "1-9 (default 2) 7zip", "level" },
+		{ "zopfli",     'Z',         POPT_ARG_INT, &zopfli,    0,       "zopfli", "numiterations" },		//{ "threshold",  't',         POPT_ARG_INT, &threshold, 0,       "compression threshold (in %, 10-100)", "threshold" },
+		{ "strip", 't',         0,            &mode,      0,       "strip", "strip unnecessary chunks" },
 		POPT_AUTOHELP,
 		POPT_TABLEEND,
 	};
 	optCon = poptGetContext(argv[0], argc, argv, optionsTable, 0);
-	poptSetOtherOptionHelp(optCon, "-c2/-z1 [-s] < before.png > after.png (only recompression is available)");
+	poptSetOtherOptionHelp(optCon, "-S9 [-t] < before.png > after.png (only recompression is available)");
 
 	for(;(optc=poptGetNextOpt(optCon))>=0;){
 		switch(optc){
-			case 'c':{
+			case 'z':{
 				char *arg=poptGetOptArg(optCon);
-				if(arg)level=strtol(arg,NULL,10);
-				else level=2;
+				if(arg)zlib=strtol(arg,NULL,10);
+				else zlib=6;
+				break;
+			}
+			case 'm':{
+				char *arg=poptGetOptArg(optCon);
+				if(arg)miniz=strtol(arg,NULL,10);
+				else miniz=1;
+				break;
+			}
+			case 's':{
+				char *arg=poptGetOptArg(optCon);
+				if(arg)slz=strtol(arg,NULL,10);
+				else slz=1;
+				break;
+			}
+			case 'l':{
+				char *arg=poptGetOptArg(optCon);
+				if(arg)libdeflate=strtol(arg,NULL,10);
+				else libdeflate=1;
+				break;
+			}
+			case 'S':{
+				char *arg=poptGetOptArg(optCon);
+				if(arg)sevenzip=strtol(arg,NULL,10);
+				else sevenzip=2;
 				break;
 			}
 		}
 	}
 
+	int level_sum=zlib+sevenzip+zopfli+miniz+slz+libdeflate;
 	if(
-		(optc<-1) ||
-		(!mode&&level==-1&&!zopfli) ||
-		(level!=-1&&zopfli) ||
-		(level>9)
+		optc<-1 ||
+		(!mode&&!zlib&&!sevenzip&&!zopfli&&!miniz&&!slz&&!libdeflate)// ||
+		//(mode&&(zlib||sevenzip||zopfli||miniz||slz||libdeflate)) ||
+		//(!mode&&(level_sum==zlib)+(level_sum==sevenzip)+(level_sum==zopfli)+(level_sum==miniz)+(level_sum==slz)+(level_sum==libdeflate)!=1)
 	){
 		poptPrintHelp(optCon, stderr, 0);
 		poptFreeContext(optCon);
 
-		fprintf(stderr,"\nUse \"-c0 -s\" to strip unnecessary chunks without recompression.\n");
+		fprintf(stderr,"\nUsing \"-t\" will cause only to strip unnecessary chunks without recompression.\n");
 
 		if(!lzmaOpen7z())fprintf(stderr,"Note: 7-zip is AVAILABLE.\n"),lzmaClose7z();
 		else fprintf(stderr,"Note: 7-zip is NOT available.\n");
 		return 1;
 	}
 
-	if(level<0&&zopfli)level=0;
-
 	if(isatty(fileno(stdin))||isatty(fileno(stdout)))
 		{poptPrintHelp(optCon, stderr, 0);poptFreeContext(optCon);return -1;}
 	poptFreeContext(optCon);
 
-	if(zopfli)fprintf(stderr,"(zopfli numiterations %d)\n",zopfli);
-	else{
-		fprintf(stderr,"compression level = %d ",level);
-		if(!lzmaOpen7z())fprintf(stderr,"(7zip)\n");
-		else fprintf(stderr,"(zlib)\n");
+	fprintf(stderr,"compression level = %d ",level_sum);
+	int ret=0;
+	if(zlib){
+		fprintf(stderr,"(zlib)\n");
+		ret=_compress(stdin,stdout,zlib,DEFLATE_ZLIB,mode);
+	}else if(sevenzip){
+		fprintf(stderr,"(7zip)\n");
+		if(lzmaOpen7z()){
+			fprintf(stderr,"7-zip is NOT available.\n");
+			return -1;
+		}
+		ret=_compress(stdin,stdout,sevenzip,DEFLATE_7ZIP,mode);
+		lzmaClose7z();
+	}else if(zopfli){
+		fprintf(stderr,"(zopfli)\n");
+		ret=_compress(stdin,stdout,zopfli,DEFLATE_ZOPFLI,mode);
+	}else if(miniz){
+		fprintf(stderr,"(miniz)\n");
+		ret=_compress(stdin,stdout,miniz,DEFLATE_MINIZ,mode);
+	}else if(slz){
+		fprintf(stderr,"(slz)\n");
+		ret=_compress(stdin,stdout,slz,DEFLATE_SLZ,mode);
+	}else if(libdeflate){
+		fprintf(stderr,"(libdeflate)\n");
+		ret=_compress(stdin,stdout,libdeflate,DEFLATE_LIBDEFLATE,mode);
 	}
-	int ret=_compress(stdin,stdout,level+zopfli*10,mode); //lol
-	lzmaClose7z();
 	return ret;
 }

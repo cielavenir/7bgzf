@@ -4,6 +4,7 @@ zlibrawstdio2: RFC 1951 (deflate)
 7gzip:         RFC 1952
 */
 
+#include "../compat.h"
 #include <stdio.h>
 #include "../lib/zlib/zlib.h"
 #include "../lib/lzma.h"
@@ -14,7 +15,6 @@ zlibrawstdio2: RFC 1951 (deflate)
 #ifdef STANDALONE
 unsigned char __compbuf[COMPBUFLEN],__decompbuf[DECOMPBUFLEN];
 #else
-#include "../compat.h"
 extern unsigned char __compbuf[COMPBUFLEN],__decompbuf[DECOMPBUFLEN];
 #endif
 
@@ -35,7 +35,7 @@ static int _compress(FILE *fin,FILE *fout,int level){
 	z_stream z;
 	int status;
 	int flush=Z_NO_FLUSH;
-	//int filesize=filelength(fileno(fin));
+	//long long filesize=filelengthi64(fileno(fin));
 
 	z.zalloc = Z_NULL;
 	z.zfree = Z_NULL;
@@ -97,7 +97,7 @@ static int _decompress(FILE *fin,FILE *fout){
 #endif
 	z_stream z;
 	int status;
-	//int filesize=filelength(fileno(fin));
+	//long long filesize=filelengthi64(fileno(fin));
 
 	z.zalloc = Z_NULL;
 	z.zfree = Z_NULL;
