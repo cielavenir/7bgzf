@@ -201,6 +201,7 @@ static int _decompress(FILE *in, FILE *out){
 
 #ifdef STANDALONE
 int main(const int argc, const char **argv){
+	initstdio();
 #else
 int _7bgzf(const int argc, const char **argv){
 #endif

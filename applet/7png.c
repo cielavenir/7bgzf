@@ -325,6 +325,7 @@ static int _compress(FILE *in, FILE *out, int level, int method, bool strip){
 
 #ifdef STANDALONE
 int main(const int argc, const char **argv){
+	initstdio();
 #else
 int _7png(const int argc, const char **argv){
 #endif

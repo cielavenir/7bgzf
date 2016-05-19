@@ -144,6 +144,7 @@ static int _decompress(FILE *fin,FILE *fout){
 
 #ifdef STANDALONE
 int main(const int argc, const char **argv){
+	initstdio();
 #else
 int zlibrawstdio2(const int argc, const char **argv){
 #endif

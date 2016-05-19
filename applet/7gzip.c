@@ -107,6 +107,7 @@ static int _decompress(FILE *fin,FILE *fout){
 
 #ifdef STANDALONE
 int main(const int argc, const char **argv){
+	initstdio();
 #else
 int _7gzip(const int argc, const char **argv){
 #endif
