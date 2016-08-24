@@ -202,15 +202,15 @@ int _7daxcr(const int argc, const char **argv){
 
 	struct poptOption optionsTable[] = {
 		//{ "longname", "shortname", argInfo,      *arg,       int val, description, argment description}
-		{ "stdout", 'c',         0,            &cmode,      0,       "stdout (currently ignored)", NULL },
-		{ "zlib",   'z',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, &zlib,       'z',     "1-9 (default 6) zlib", "level" },
-		{ "miniz",     'm',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, &miniz,    'm',       "1-2 (default 1) miniz", "level" },
-		{ "slz",     's',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, &slz,    's',       "1-1 (default 1) slz", "level" },
-		{ "libdeflate",     'l',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, &libdeflate,    'l',       "1-12 (default 6) libdeflate", "level" },
-		{ "7zip",     'S',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, &sevenzip,    'S',       "1-9 (default 2) 7zip", "level" },
+		{ "stdout", 'c',         POPT_ARG_NONE,            &cmode,      0,       "stdout (currently ignored)", NULL },
+		{ "zlib",   'z',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,       'z',     "1-9 (default 6) zlib", "level" },
+		{ "miniz",     'm',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,    'm',       "1-2 (default 1) miniz", "level" },
+		{ "slz",     's',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,    's',       "1-1 (default 1) slz", "level" },
+		{ "libdeflate",     'l',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,    'l',       "1-12 (default 6) libdeflate", "level" },
+		{ "7zip",     'S',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,    'S',       "1-9 (default 2) 7zip", "level" },
 		{ "zopfli",     'Z',         POPT_ARG_INT, &zopfli,    0,       "zopfli", "numiterations" },
 		//{ "threshold",  't',         POPT_ARG_INT, &threshold, 0,       "compression threshold (in %, 10-100)", "threshold" },
-		{ "decompress", 'd',         0,            &mode,      0,       "decompress", NULL },
+		{ "decompress", 'd',         POPT_ARG_NONE,            &mode,      0,       "decompress", NULL },
 		POPT_AUTOHELP,
 		POPT_TABLEEND,
 	};
@@ -221,31 +221,31 @@ int _7daxcr(const int argc, const char **argv){
 		switch(optc){
 			case 'z':{
 				char *arg=poptGetOptArg(optCon);
-				if(arg)zlib=strtol(arg,NULL,10);
+				if(arg)zlib=strtol(arg,NULL,10),free(arg);
 				else zlib=6;
 				break;
 			}
 			case 'm':{
 				char *arg=poptGetOptArg(optCon);
-				if(arg)miniz=strtol(arg,NULL,10);
+				if(arg)miniz=strtol(arg,NULL,10),free(arg);
 				else miniz=1;
 				break;
 			}
 			case 's':{
 				char *arg=poptGetOptArg(optCon);
-				if(arg)slz=strtol(arg,NULL,10);
+				if(arg)slz=strtol(arg,NULL,10),free(arg);
 				else slz=1;
 				break;
 			}
 			case 'l':{
 				char *arg=poptGetOptArg(optCon);
-				if(arg)libdeflate=strtol(arg,NULL,10);
+				if(arg)libdeflate=strtol(arg,NULL,10),free(arg);
 				else libdeflate=1;
 				break;
 			}
 			case 'S':{
 				char *arg=poptGetOptArg(optCon);
-				if(arg)sevenzip=strtol(arg,NULL,10);
+				if(arg)sevenzip=strtol(arg,NULL,10),free(arg);
 				else sevenzip=2;
 				break;
 			}
