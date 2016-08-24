@@ -1,11 +1,19 @@
-#include "poptsystem.h"
+#include "system.h"
 #include <stdarg.h>
 #include "poptint.h"
+
+#if defined(HAVE_ASSERT_H)
+#include <assert.h>
+#else
+#define assert(_x)
+#endif
 
 /* Any pair of 32 bit hashes can be used. lookup3.c generates pairs, will do. */
 //#define _JLU3_jlu32lpair        1
 //#define	jlu32lpair	poptJlu32lpair
-//#include "poptlookup3.c"
+//#define _JLU3_jlu32lpair        1
+//#define	jlu32lpair	poptJlu32lpair
+//#include "lookup3.c"
 
 /*@-varuse +charint +ignoresigns @*/
 /*@unchecked@*/ /*@observer@*/
@@ -60,7 +68,7 @@ POPT_dgettext(const char * dom, const char * str)
     char * codeset = NULL;
     char * retval = NULL;
 
-    if (!dom) 
+    if (!dom)
 	dom = textdomain(NULL);
     codeset = bind_textdomain_codeset(dom, NULL);
     bind_textdomain_codeset(dom, "UTF-8");
@@ -98,13 +106,14 @@ strdup_locale_from_utf8 (/*@null@*/ char * istr)
 	char * shift_pin = NULL;
 	size_t db = strlen(istr);
 /*@owned@*/
-	char * dstr = malloc((db + 1) * sizeof(*dstr));
+	char * dstr = (char*) xmalloc((db + 1) * sizeof(*dstr));
 	char * pin = istr;
 	char * pout = dstr;
 	size_t ib = db;
 	size_t ob = db;
 	size_t err;
 
+assert(dstr);	/* XXX can't happen */
 	if (dstr == NULL)
 	    return NULL;
 	err = iconv(cd, NULL, NULL, NULL, NULL);
@@ -123,7 +132,8 @@ strdup_locale_from_utf8 (/*@null@*/ char * istr)
 	    case E2BIG:
 	    {	size_t used = (size_t)(pout - dstr);
 		db *= 2;
-		dstr = realloc(dstr, (db + 1) * sizeof(*dstr));
+		dstr = (char*) xrealloc(dstr, (db + 1) * sizeof(*dstr));
+assert(dstr);	/* XXX can't happen */
 		if (dstr != NULL) {
 		    pout = dstr + used;
 		    ob = db - used;
@@ -139,7 +149,7 @@ strdup_locale_from_utf8 (/*@null@*/ char * istr)
 	}
 	(void) iconv_close(cd);
 	*pout = '\0';
-	ostr = xstrdup(dstr);
+	ostr = xstrdup(dstr ? dstr : istr);
 	free(dstr);
     } else
 	ostr = xstrdup(istr);
@@ -152,7 +162,7 @@ strdup_locale_from_utf8 (/*@null@*/ char * istr)
 int
 POPT_fprintf (FILE * stream, const char * format, ...)
 {
-    char * b = NULL, * ob = NULL;
+    char * b = NULL;
     int rc;
     va_list ap;
 
@@ -169,7 +179,7 @@ POPT_fprintf (FILE * stream, const char * format, ...)
      * to do with whether the final '\0' is counted (or not). The code
      * below already adds +1 for the (possibly already counted) trailing NUL.
      */
-    while ((b = realloc(b, nb+1)) != NULL) {
+    while ((b = (char*) xrealloc(b, nb+1)) != NULL) {
 	va_start(ap, format);
 	rc = vsnprintf(b, nb, format, ap);
 	va_end(ap);
@@ -186,6 +196,7 @@ POPT_fprintf (FILE * stream, const char * format, ...)
     rc = 0;
     if (b != NULL) {
 #ifdef HAVE_ICONV
+    	char * ob = NULL;
 	ob = strdup_locale_from_utf8(b);
 	if (ob != NULL) {
 	    rc = fprintf(stream, "%s", ob);

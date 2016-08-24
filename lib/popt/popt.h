@@ -11,8 +11,6 @@
 
 #include <stdio.h>			/* for FILE * */
 
-#define POPT_OPTION_DEPTH	10
-
 /** \ingroup popt
  * \name Arg type identifiers
  */
@@ -71,6 +69,7 @@
 #define	POPT_ARGFLAG_SHOW_DEFAULT 0x00800000U /*!< show default value in --help */
 #define	POPT_ARGFLAG_RANDOM	0x00400000U  /*!< random value in [1,arg] */
 #define	POPT_ARGFLAG_TOGGLE	0x00200000U  /*!< permit --[no]opt prefix toggle */
+#define	POPT_ARGFLAG_CALCULATOR	0x00100000U  /*!< argDescr has RPN string */
 
 /*@}*/
 
@@ -101,6 +100,9 @@
 #define	POPT_ERROR_NULLARG	-20	/*!< opt->arg should not be NULL */
 #define	POPT_ERROR_MALLOC	-21	/*!< memory allocation failed */
 #define	POPT_ERROR_BADCONFIG	-22	/*!< config file failed sanity test */
+#define	POPT_ERROR_UNWANTEDARG	-23	/*!< option does not take an argument */
+#define	POPT_ERROR_STACKUNDERFLOW	-24	/*!< stack underflow */
+#define	POPT_ERROR_STACKOVERFLOW	-25	/*!< stack overflow */
 /*@}*/
 
 /** \ingroup popt
@@ -165,6 +167,10 @@ typedef struct poptItem_s {
  */
 /*@{*/
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * Empty table marker to enable displaying popt alias/exec options.
  */
@@ -218,9 +224,6 @@ enum poptCallbackReason {
 };
 /*@=exportconst@*/
 
-#ifdef __cplusplus
-extern "C" {
-#endif
 /*@-type@*/
 
 /** \ingroup popt
@@ -228,8 +231,8 @@ extern "C" {
  * @param con		context
  * @param reason	reason for callback
  * @param opt		option that triggered callback
- * @param arg		@todo Document.
- * @param data		@todo Document.
+ * @param arg		arg value
+ * @param data		callback data
  */
 typedef void (*poptCallbackType) (poptContext con, 
 		enum poptCallbackReason reason,
@@ -424,7 +427,7 @@ int poptReadConfigFile(poptContext con, const char * fn)
 /** \ingroup popt
  * Read configuration file(s).
  * Colon separated files to read, looping over poptReadConfigFile().
- * Note that an '@' character preceeding a path in the list will
+ * Note that an '@' character preceding a path in the list will
  * also perform additional sanity checks on the file before reading.
  * @param con		context
  * @param paths		colon separated file name(s) to read
@@ -467,8 +470,6 @@ int poptDupArgv(int argc, /*@null@*/ const char **argv,
  * Parse a string into an argument array.
  * The parse allows ', ", and \ quoting, but ' is treated the same as " and
  * both may include \ quotes.
- * @note: The argument array is malloc'd as a single area, so only argv must
- * be free'd.
  *
  * @param s		string to parse
  * @retval argcPtr	address of returned no. of arguments
@@ -477,6 +478,13 @@ int poptDupArgv(int argc, /*@null@*/ const char **argv,
 int poptParseArgvString(const char * s,
 		/*@out@*/ int * argcPtr, /*@out@*/ const char *** argvPtr)
 	/*@modifies *argcPtr, *argvPtr @*/;
+
+/** \ingroup popt
+ * Free the argument array.
+ * @param argv		argument array.
+ * @retval		NULL always
+ */
+const char ** poptArgvFree(const char ** argv);
 
 /** \ingroup popt
  * Parses an input configuration file and returns an string that is a 

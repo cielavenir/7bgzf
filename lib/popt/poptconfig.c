@@ -3,10 +3,10 @@
  */
 
 /* (C) 1998-2002 Red Hat, Inc. -- Licensing details are in the COPYING
-   file accompanying popt source distributions, available from 
+   file accompanying popt source distributions, available from
    ftp://ftp.rpm.org/pub/rpm/dist. */
 
-#include "poptsystem.h"
+#include "system.h"
 #include "poptint.h"
 #include <sys/stat.h>
 
@@ -42,11 +42,10 @@ extern int glob_pattern_p (const char *__pattern, int __quote)
 /*@=declundef =exportheader =incondefs =protoparammatch =redecl =type @*/
 #endif	/* __LCLINT__ */
 
-#if !defined(__GLIBC__)
 /* Return nonzero if PATTERN contains any metacharacters.
    Metacharacters can be quoted with backslashes if QUOTE is nonzero.  */
 static int
-glob_pattern_p (const char * pattern, int quote)
+poptGlob_pattern_p (const char * pattern, int quote)
 	/*@*/
 {
     const char * p;
@@ -72,7 +71,6 @@ glob_pattern_p (const char * pattern, int quote)
     }
     return 0;
 }
-#endif	/* !defined(__GLIBC__) */
 
 /*@unchecked@*/
 static int poptGlobFlags = 0;
@@ -84,6 +82,12 @@ static int poptGlob_error(/*@unused@*/ UNUSED(const char * epath),
     return 1;
 }
 #endif	/* HAVE_GLOB_H */
+
+#if defined(HAVE_ASSERT_H)
+#include <assert.h>
+#else
+#define assert(_x)
+#endif
 
 /**
  * Return path(s) from a glob pattern.
@@ -105,7 +109,7 @@ static int poptGlob(/*@unused@*/ UNUSED(poptContext con), const char * pattern,
 	pat++;
 
 #if defined(HAVE_GLOB_H)
-    if (glob_pattern_p(pat, 0)) {
+    if (poptGlob_pattern_p(pat, 0)) {
 	glob_t _g, *pglob = &_g;
 
 	if (!glob(pat, poptGlobFlags, poptGlob_error, pglob)) {
@@ -129,7 +133,7 @@ static int poptGlob(/*@unused@*/ UNUSED(poptContext con), const char * pattern,
     {
 	if (acp)
 	    *acp = 1;
-	if (avp && (*avp = calloc((size_t)(1 + 1), sizeof (**avp))) != NULL)
+	if (avp && (*avp = (const char**) calloc((size_t)(1 + 1), sizeof (**avp))) != NULL)
 	    (*avp)[0] = xstrdup(pat);
     }
 
@@ -140,7 +144,7 @@ static int poptGlob(/*@unused@*/ UNUSED(poptContext con), const char * pattern,
 
 int poptSaneFile(const char * fn)
 {
-#if defined(FEOS) || defined(WIN32) || (!defined(__GNUC__) && !defined(__clang__))
+#if defined(FEOS) || defined(_WIN32) || (!defined(__GNUC__) && !defined(__clang__))
 #else
     struct stat sb;
     uid_t uid = getuid();
@@ -164,7 +168,6 @@ int poptReadFile(const char * fn, char ** bp, size_t * nbp, int flags)
     int fdno;
     char * b = NULL;
     off_t nb = 0;
-    char * s, * t, * se;
     int rc = POPT_ERROR_ERRNO;	/* assume failure */
 
     fdno = open(fn, O_RDONLY);
@@ -173,7 +176,7 @@ int poptReadFile(const char * fn, char ** bp, size_t * nbp, int flags)
 
     if ((nb = lseek(fdno, 0, SEEK_END)) == (off_t)-1
      || lseek(fdno, 0, SEEK_SET) == (off_t)-1
-     || (b = calloc(sizeof(*b), (size_t)nb + 1)) == NULL
+     || (b = (char*) calloc(sizeof(*b), (size_t)nb + 1)) == NULL
      || read(fdno, (char *)b, (size_t)nb) != (ssize_t)nb)
     {
 	int oerrno = errno;
@@ -194,6 +197,7 @@ int poptReadFile(const char * fn, char ** bp, size_t * nbp, int flags)
     if (flags & POPT_READFILE_TRIMNEWLINES)
 /*@=bitwisesigned@*/
     {
+	char * s, * t, * se;
 	for (t = b, s = b, se = b + nb; *s && s < se; s++) {
 	    switch (*s) {
 	    case '\\':
@@ -214,10 +218,8 @@ int poptReadFile(const char * fn, char ** bp, size_t * nbp, int flags)
 exit:
     if (rc != 0) {
 /*@-usedef@*/
-	if (b)
-	    free(b);
+	b=_free(b);
 /*@=usedef@*/
-	b = NULL;
 	nb = 0;
     }
     if (bp)
@@ -280,7 +282,7 @@ static int poptConfigLine(poptContext con, char * line)
 
     if (con->appName == NULL)
 	goto exit;
-    
+
     memset(item, 0, sizeof(*item));
 
     appName = se;
@@ -324,7 +326,8 @@ static int poptConfigLine(poptContext con, char * line)
 	/* Append remaining text to the interpolated file option text. */
 	if (*se != '\0') {
 	    size_t nse = strlen(se) + 1;
-	    if ((b = realloc(b, (nb + nse))) == NULL)	/* XXX can't happen */
+	    /* cppcheck-suppress memleakOnRealloc  */
+	    if ((b = (char*) realloc(b, (nb + nse))) == NULL)	/* XXX can't happen */
 		goto exit;
 	    (void) stpcpy( stpcpy(&b[nb-1], " "), se);
 	    nb += nse;
@@ -337,8 +340,7 @@ static int poptConfigLine(poptContext con, char * line)
 		longName++;
 	    else
 		longName = fn;
-	    if (longName == NULL)	/* XXX can't happen. */
-		goto exit;
+assert(longName != NULL);	/* XXX can't happen. */
 	    /* Single character basenames are treated as short options. */
 	    if (longName[1] != '\0')
 		item->option.longName = longName;
@@ -377,7 +379,7 @@ static int poptConfigLine(poptContext con, char * line)
 	item->argc = j;
     }
 /*@=modobserver@*/
-	
+
 /*@-nullstate@*/ /* FIX: item->argv[] may be NULL */
     if (!strcmp(entryType, "alias"))
 	rc = poptAddItem(con, item, 0);
@@ -386,8 +388,7 @@ static int poptConfigLine(poptContext con, char * line)
 /*@=nullstate@*/
 exit:
     rc = 0;	/* XXX for now, always return success */
-    if (b)
-	free(b);
+    b = _free(b);
     return rc;
 }
 /*@=compmempass@*/
@@ -399,14 +400,15 @@ int poptReadConfigFile(poptContext con, const char * fn)
     const char *se;
     char *t, *te;
     int rc;
-    int xx;
 
     if ((rc = poptReadFile(fn, &b, &nb, POPT_READFILE_TRIMNEWLINES)) != 0)
 	return (errno == ENOENT ? 0 : rc);
-    if (b == NULL || nb == 0)
-	return POPT_ERROR_BADCONFIG;
+    if (b == NULL || nb == 0) {
+	rc = POPT_ERROR_BADCONFIG;
+	goto exit;
+    }
 
-    if ((t = malloc(nb + 1)) == NULL)
+    if ((t = (char*) malloc(nb + 1)) == NULL)
 	goto exit;
     te = t;
 
@@ -417,8 +419,9 @@ int poptReadConfigFile(poptContext con, const char * fn)
 	    *te = '\0';
 	    te = t;
 	    while (*te && _isspaceptr(te)) te++;
-	    if (*te && *te != '#')
-		xx = poptConfigLine(con, te);
+	    if (*te && *te != '#') {
+		poptConfigLine(con, te); /* XXX: unchecked */
+            }
 	    /*@switchbreak@*/ break;
 /*@-usedef@*/	/* XXX *se may be uninitialized */
 	  case '\\':
@@ -436,12 +439,11 @@ int poptReadConfigFile(poptContext con, const char * fn)
 	}
     }
 
-    free(t);
+    t=_free(t);
     rc = 0;
 
 exit:
-    if (b)
-	free(b);
+     b=_free(b);
     return rc;
 }
 
@@ -484,16 +486,13 @@ int poptReadConfigFiles(poptContext con, const char * paths)
 	    xx = poptReadConfigFile(con, fn);
 	    if (xx && rc == 0)
 		rc = xx;
-	    free((void *)av[i]);
-	    av[i] = NULL;
+	    av[i]=_free((void *)av[i]);
 	}
-	free(av);
-	av = NULL;
+	av=_free(av);
     }
 
 /*@-usedef@*/
-    if (buf)
-	free(buf);
+    buf=_free(buf);
 /*@=usedef@*/
 
     return rc;
@@ -502,29 +501,24 @@ int poptReadConfigFiles(poptContext con, const char * paths)
 #if 0
 int poptReadDefaultConfig(poptContext con, /*@unused@*/ UNUSED(int useEnv))
 {
-    static const char _popt_sysconfdir[] = POPT_SYSCONFDIR "/popt";
-    static const char _popt_etc[] = "/etc/popt";
+    static const char _popt_alias[] = POPT_ALIAS;
     char * home;
-    struct stat sb;
     int rc = 0;		/* assume success */
 
     if (con->appName == NULL) goto exit;
 
-    if (strcmp(_popt_sysconfdir, _popt_etc)) {
-	rc = poptReadConfigFile(con, _popt_sysconfdir);
-	if (rc) goto exit;
-    }
-
-    rc = poptReadConfigFile(con, _popt_etc);
+    rc = poptReadConfigFile(con, _popt_alias);
     if (rc) goto exit;
 
 #if defined(HAVE_GLOB_H)
-    if (!stat("/etc/popt.d", &sb) && S_ISDIR(sb.st_mode)) {
+    {
+    struct stat sb;
+    if (!stat("SYSCONFDIR/popt.d", &sb) && S_ISDIR(sb.st_mode)) {
 	const char ** av = NULL;
 	int ac = 0;
-	int i;
 
-	if ((rc = poptGlob(con, "/etc/popt.d/*", &ac, &av)) == 0) {
+	if ((rc = poptGlob(con, "SYSCONFDIR/popt.d/*", &ac, &av)) == 0) {
+	    int i;
 	    for (i = 0; rc == 0 && i < ac; i++) {
 		const char * fn = av[i];
 		if (fn == NULL || strstr(fn, ".rpmnew") || strstr(fn, ".rpmsave"))
@@ -534,22 +528,21 @@ int poptReadDefaultConfig(poptContext con, /*@unused@*/ UNUSED(int useEnv))
 			continue;
 		}
 		rc = poptReadConfigFile(con, fn);
-		free((void *)av[i]);
-		av[i] = NULL;
+		av[i]=_free((void *)av[i]);
 	    }
-	    free(av);
-	    av = NULL;
+	    av=_free(av);
 	}
+     }
     }
     if (rc) goto exit;
 #endif
 
     if ((home = getenv("HOME"))) {
-	char * fn = malloc(strlen(home) + 20);
+        char * fn = (char*) malloc(strlen(home) + 20);
 	if (fn != NULL) {
 	    (void) stpcpy(stpcpy(fn, home), "/.popt");
 	    rc = poptReadConfigFile(con, fn);
-	    free(fn);
+	    fn=_free(fn);
 	} else
 	    rc = POPT_ERROR_ERRNO;
 	if (rc) goto exit;
@@ -578,7 +571,7 @@ poptInit(int argc, const char ** argv,
 
     if ((argv0 = strrchr(argv[0], '/')) != NULL) argv0++;
     else argv0 = argv[0];
-   
+
     con = poptGetContext(argv0, argc, (const char **)argv, options, 0);
     if (con != NULL&& poptReadConfigFiles(con, configPaths))
 	con = poptFini(con);

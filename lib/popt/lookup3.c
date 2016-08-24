@@ -34,7 +34,7 @@
 */
 /* -------------------------------------------------------------------- */
 
-#include <stdio.h>
+#include <stdio.h> //size_t
 #include <stdint.h>
 
 //#if defined(_JLU3_SELFTEST)
@@ -52,7 +52,7 @@
 static const union _dbswap {
     const uint32_t ui;
     const unsigned char uc[4];
-} endian = { .ui = 0x11223344 };
+} endian = { 0x11223344 };
 # define HASH_LITTLE_ENDIAN	(endian.uc[0] == (unsigned char) 0x44)
 # define HASH_BIG_ENDIAN	(endian.uc[0] == (unsigned char) 0x11)
 /*@=redef@*/
@@ -279,7 +279,7 @@ uint32_t jlu32l(uint32_t h, const void *key, size_t size)
 	 * rest of the string.  Every machine with memory protection I've seen
 	 * does it on word boundaries, so is OK with this.  But VALGRIND will
 	 * still catch it and complain.  The masking trick does make the hash
-	 * noticably faster for short strings (like English words).
+	 * noticeably faster for short strings (like English words).
 	 */
 #ifndef VALGRIND
 
@@ -485,7 +485,7 @@ void jlu32lpair(const void *key, size_t size, uint32_t *pc, uint32_t *pb)
 	 * rest of the string.  Every machine with memory protection I've seen
 	 * does it on word boundaries, so is OK with this.  But VALGRIND will
 	 * still catch it and complain.  The masking trick does make the hash
-	 * noticably faster for short strings (like English words).
+	 * noticeably faster for short strings (like English words).
 	 */
 #ifndef VALGRIND
 
@@ -689,7 +689,7 @@ uint32_t jlu32b(uint32_t h, const void *key, size_t size)
 	 * rest of the string.  Every machine with memory protection I've seen
 	 * does it on word boundaries, so is OK with this.  But VALGRIND will
 	 * still catch it and complain.  The masking trick does make the hash
-	 * noticably faster for short strings (like English words).
+	 * noticeably faster for short strings (like English words).
 	 */
 #ifndef VALGRIND
 
@@ -851,7 +851,7 @@ static void driver2(void)
 			printf("Some bit didn't change: ");
 			printf("%.8x %.8x %.8x %.8x %.8x %.8x  ",
 				e[0],f[0],g[0],h[0],x[0],y[0]);
-			printf("i %d j %d m %d len %d\n", i, j, m, hlen);
+			printf("i %u j %u m %u len %d\n", i, j, m, hlen);
 		    }
 		    if (z == MAXPAIR) goto done;
 		}
@@ -859,7 +859,7 @@ static void driver2(void)
 	}
    done:
 	if (z < MAXPAIR) {
-	    printf("Mix success  %2d bytes  %2d initvals  ",i,m);
+	    printf("Mix success  %2u bytes  %2u initvals  ",i,m);
 	    printf("required  %d  trials\n", z/2);
 	}
     }
@@ -935,7 +935,7 @@ static void driver3(void)
 	    x = jlu32l(m, b, len);
 	    y = jlu32l(m, b, len);
 	    if ((ref != x) || (ref != y)) 
-		printf("alignment error: %.8x %.8x %.8x %d %d\n",ref,x,y, h, i);
+		printf("alignment error: %.8x %.8x %.8x %u %u\n",ref,x,y, h, i);
 	}
     }
 }
