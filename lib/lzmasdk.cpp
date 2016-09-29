@@ -260,6 +260,12 @@ int lzmaCreateCoder(void **coder,unsigned long long int id,int encode,int level)
 	PROPVARIANT VAR[]={{VT_UI4,0,0,0,{0}}};
 	VAR[0].ulVal=level;
 	coderprop->SetCoderProperties(ID,VAR,1);
+	if(id==0x030101){ //set kEndMarker for lzma
+		PROPID IDlzma[]={NCoderPropID::kEndMarker};
+		PROPVARIANT VARlzma[]={{VT_BOOL,0,0,0,{0}}};
+		VARlzma[0].boolVal=VARIANT_TRUE;
+		coderprop->SetCoderProperties(IDlzma,VARlzma,1);
+	}
 #else
 	//Deflate(64)
 	if(id==0x040108||id==0x040109){
