@@ -431,6 +431,9 @@ int _7png(const int argc, const char **argv){
 	}else if(libdeflate){
 		fprintf(stderr,"(libdeflate)\n");
 		ret=_compress(stdin,stdout,libdeflate,DEFLATE_LIBDEFLATE,mode);
+	}else if(mode){
+		fprintf(stderr,"(strip)\n");
+		ret=_compress(stdin,stdout,0,0,mode);
 	}
 	return ret;
 }

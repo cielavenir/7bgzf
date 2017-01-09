@@ -8,10 +8,15 @@ zlibrawstdio2: RFC 1951 (deflate)
 #include <stdio.h>
 #include <time.h>
 #include "../lib/zlib/zlib.h"
+#include "../lib/zlib/zutil.h"
 #include "../lib/lzma.h"
+
+#define DECOMPBUFLEN (1<<16)
+#define COMPBUFLEN   (DECOMPBUFLEN|(DECOMPBUFLEN>>1))
 
 #ifdef STANDALONE
 unsigned char buf[BUFLEN];
+unsigned char __compbuf[COMPBUFLEN],__decompbuf[DECOMPBUFLEN];
 
 unsigned int read32(const void *p){
 	const unsigned char *x=(const unsigned char*)p;
@@ -23,6 +28,7 @@ void write32(void *p, const unsigned int n){
 }
 #else
 #include "../lib/xutil.h"
+extern unsigned char __compbuf[COMPBUFLEN],__decompbuf[DECOMPBUFLEN];
 #endif
 
 typedef struct{
@@ -67,7 +73,11 @@ static int _compress(FILE *fin,FILE *fout,int level){
 			fflush(fout);
 		}
 		lzmaClose7z();
-	}else{
+		return 0;
+	}
+
+#if 0
+	{
 		char mode[]="wb0";
 		mode[2]+=level;
 		int readlen;
@@ -84,10 +94,62 @@ static int _compress(FILE *fin,FILE *fout,int level){
 		}
 		gzclose(gz);
 #endif
+		return 0;
 	}
+#endif
+
+	z_stream z;
+	int status;
+	int flush=Z_NO_FLUSH;
+	//long long filesize=filelengthi64(fileno(fin));
+
+	z.zalloc = Z_NULL;
+	z.zfree = Z_NULL;
+	z.opaque = Z_NULL;
+
+	if(deflateInit2(&z,level,Z_DEFLATED, MAX_WBITS+16, DEF_MEM_LEVEL, Z_DEFAULT_STRATEGY) != Z_OK){
+		fprintf(stderr,"deflateInit: %s\n", (z.msg) ? z.msg : "???");
+		return 1;
+	}
+
+	z.next_in = __decompbuf;
+	z.avail_in = fread(__decompbuf,1,DECOMPBUFLEN,fin);
+	z.next_out = __compbuf;
+	z.avail_out = COMPBUFLEN;
+	if(z.avail_in < DECOMPBUFLEN)flush=Z_FINISH;
+
+	for(;;){
+		status = deflate(&z, flush);
+		if(status == Z_STREAM_END)break;
+		if(status != Z_OK){
+			fprintf(stderr,"deflate: %s\n", (z.msg) ? z.msg : "???");
+			return 10;
+		}
+
+		//goto next buffer
+		if(z.avail_in == 0){
+			//if(flush==Z_FINISH){fprintf(stderr,"failed to complete deflation.\n");return 11;}
+			z.next_in = __decompbuf;
+			z.avail_in = fread(__decompbuf,1,DECOMPBUFLEN,fin);
+			if(z.avail_in < DECOMPBUFLEN)flush=Z_FINISH;
+		}
+		if(z.avail_out == 0){
+			fwrite(__compbuf,1,COMPBUFLEN,fout);
+			z.next_out = __compbuf;
+			z.avail_out = COMPBUFLEN;
+		}
+	}
+	fwrite(__compbuf,1,COMPBUFLEN-z.avail_out,fout);
+
+	if(deflateEnd(&z) != Z_OK){
+		fprintf(stderr,"deflateEnd: %s\n", (z.msg) ? z.msg : "???");
+		return 2;
+	}
+
 	return 0;
 }
 
+//we still use gzip wrapper functions for concatenated gzip files.
 static int _decompress(FILE *fin,FILE *fout){
 	int readlen;
 #ifdef FEOS
