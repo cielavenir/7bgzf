@@ -31,7 +31,7 @@ int bgzf_compress(void *_dst, size_t *_dlen, const void *src, size_t slen, int l
 		*_dlen=28;
 		memcpy(_dst,
 			"\x1f\x8b\x08\x04\x00\x00\x00\x00\x00\xff" // header         (10)
-			"\x06\x00BC\x02\x00"                       // extra header   (6)
+			"\x06\0BC\x02\x00"                         // extra header   (6)
 			"\x1b\x00"                                 // size(28-1)     (2)
 			"\x03\x00"                                 // null deflation (2)
 			"\x00\x00\x00\x00\x00\x00\x00\x00"         // footer         (8)
@@ -44,7 +44,7 @@ int bgzf_compress(void *_dst, size_t *_dlen, const void *src, size_t slen, int l
 	if(_smethod&&*_smethod){
 		char *smethod=alloca(strlen(_smethod)+1);
 		strcpy(smethod,_smethod);
-		fputs(smethod,stderr);fputs("\n",stderr);
+		//fputs(smethod,stderr);fputs("\n",stderr);
 		//set level
 		int _level=-1;
 		int l=strlen(smethod);
@@ -142,7 +142,7 @@ int bgzf_compress(void *_dst, size_t *_dlen, const void *src, size_t slen, int l
 		}
 	}
 	*_dlen=dlen+25;
-	memcpy(_dst,"\x1f\x8b\x08\x04\x00\x00\x00\x00\x00\xff\x06\x00BC\x02\x00",16);
+	memcpy(_dst,"\x1f\x8b\x08\x04\x00\x00\x00\x00\x00\xff\x06\0BC\x02\x00",16);
 	write16(_dst+16,*_dlen);
 	write32(dst+dlen,crc32(0,src,slen));
 	write32(dst+dlen+4,slen);

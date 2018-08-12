@@ -141,7 +141,7 @@ static int _compress(FILE *in, FILE *out, int level, int method){
 			}
 			fwrite("\x1f\x8b\x08\x04\x00\x00\x00\x00\x00\xff",1,10,out);
 			//extra field
-			fwrite("\x06\x00BC\x02\x00",1,6,out);
+			fwrite("\x06\0BC\x02\x00",1,6,out);
 			write16(buf,compsize_record);
 			fwrite(buf,1,2,out);
 			fwrite(__compbuf,1,compsize,out);
