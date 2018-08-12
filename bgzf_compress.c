@@ -77,6 +77,15 @@ int bgzf_compress(void *_dst, size_t *_dlen, const void *src, size_t slen, int l
 		}
 	}
 
+	if(level<0){
+		if(method==DEFLATE_ZLIB)level=6;
+		if(method==DEFLATE_7ZIP)level=2;
+		if(method==DEFLATE_ZOPFLI)level=1;
+		if(method==DEFLATE_MINIZ)level=1;
+		if(method==DEFLATE_SLZ)level=1;
+		if(method==DEFLATE_LIBDEFLATE)level=6;
+	}
+
 	//compress
 	if(*_dlen<26)return -1;
 	size_t dlen=*_dlen-26;
