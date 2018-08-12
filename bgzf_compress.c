@@ -2,28 +2,29 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <alloca.h>
 
 #include "lib/zlibutil.h"
 #include "lib/lzma.h"
 
-void write32(void *p, const unsigned int n){
+static void write32(void *p, const unsigned int n){
 	unsigned char *x=(unsigned char*)p;
 	x[0]=n&0xff,x[1]=(n>>8)&0xff,x[2]=(n>>16)&0xff,x[3]=(n>>24)&0xff;
 }
-void write16(void *p, const unsigned short n){
+static void write16(void *p, const unsigned short n){
 	unsigned char *x=(unsigned char*)p;
 	x[0]=n&0xff,x[1]=(n>>8)&0xff;
 }
 
-__attribute__((constructor)) void init(){
-	lzmaOpen7z();
-}
+static bool loaded7z=false;
+//__attribute__((constructor)) void init(){
+//      lzmaOpen7z();
+//}
 __attribute__((destructor)) void finish(){
-	lzmaClose7z();
+        if(loaded7z)lzmaClose7z();
 }
 
 int bgzf_compress(void *_dst, size_t *_dlen, const void *src, size_t slen, int level){
-abort();
 	if(!slen){
 		if(*_dlen<28)return -1;
 		*_dlen=28;
@@ -42,7 +43,7 @@ abort();
 	if(_smethod&&*_smethod){
 		char *smethod=alloca(strlen(_smethod)+1);
 		strcpy(smethod,_smethod);
-		fputs(smethod,stderr);
+		fputs(smethod,stderr);fputs("\n",stderr);
 		//set level
 		int _level=-1;
 		int l=strlen(smethod);
@@ -62,16 +63,16 @@ abort();
 			method=DEFLATE_7ZIP;
 		}
 		if(!strcasecmp(smethod,"zopfli")){
-			method=DEFLATE_ZLIB;
+			method=DEFLATE_ZOPFLI;
 		}
 		if(!strcasecmp(smethod,"miniz")){
-			method=DEFLATE_ZLIB;
+			method=DEFLATE_MINIZ;
 		}
 		if(!strcasecmp(smethod,"slz") || !strcasecmp(smethod,"libslz")){
-			method=DEFLATE_ZLIB;
+			method=DEFLATE_SLZ;
 		}
 		if(!strcasecmp(smethod,"libdeflate")){
-			method=DEFLATE_ZLIB;
+			method=DEFLATE_LIBDEFLATE;
 		}
 	}
 
@@ -88,6 +89,7 @@ abort();
 		}
 	}
 	if(method==DEFLATE_7ZIP){
+		if(!loaded7z)lzmaOpen7z();
 		void *coder=NULL;
 		lzmaCreateCoder(&coder,0x040108,1,level);
 		if(coder){
