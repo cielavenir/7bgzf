@@ -1,3 +1,5 @@
+// BGZF_METHOD=slz1 LD_PRELOAD=./7bgzf.so
+
 #include "compat.h"
 #include <stdio.h>
 #include <string.h>
