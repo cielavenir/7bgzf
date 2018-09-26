@@ -1,4 +1,5 @@
-// BGZF_METHOD=slz1 LD_PRELOAD=./7bgzf.so
+// BGZF_METHOD=slz1 LD_PRELOAD=./7bgzf.so [samtools|bcftools]
+// samtools/bcftools need to link libhts.so (not a)
 
 #include "compat.h"
 #include <stdio.h>
