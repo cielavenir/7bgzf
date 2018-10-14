@@ -155,6 +155,13 @@ static int _compress(FILE *in, FILE *out, int level, int method){
 		}
 		if((i+1)%64==0)fprintf(stderr,"%d\r",i+1);
 	}
+	fwrite(
+		"\x1f\x8b\x08\x04\x00\x00\x00\x00\x00\xff" // header         (10)
+		"\x06\0BC\x02\x00"                         // extra header   (6)
+		"\x1b\x00"                                 // size(28-1)     (2)
+		"\x03\x00"                                 // null deflation (2)
+		"\x00\x00\x00\x00\x00\x00\x00\x00",        // footer         (8)
+		1,28,out);
 	fprintf(stderr,"%d done.\n",i);
 	lzmaDestroyCoder(&coder);
 	return 0;
