@@ -49,9 +49,9 @@ int libdeflate_deflate(
 	size_t sourceLen,
 	int level
 ){
-	struct deflate_compressor *comp=deflate_alloc_compressor(level);
-	size_t siz=deflate_compress(comp,source,sourceLen,dest,*destLen);
-	deflate_free_compressor(comp);
+	struct libdeflate_compressor *comp=(struct libdeflate_compressor*)libdeflate_alloc_compressor(level);
+	size_t siz=libdeflate_deflate_compress(comp,source,sourceLen,dest,*destLen);
+	libdeflate_free_compressor(comp);
 	if(!siz)return !Z_OK;
 	*destLen=siz;
 	return Z_OK;

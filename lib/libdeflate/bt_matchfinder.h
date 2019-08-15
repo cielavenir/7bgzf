@@ -1,11 +1,30 @@
 /*
  * bt_matchfinder.h - Lempel-Ziv matchfinding with a hash table of binary trees
  *
- * Author:	Eric Biggers
- * Year:	2014-2016
+ * Originally public domain; changes after 2016-09-07 are copyrighted.
  *
- * The author dedicates this file to the public domain.
- * You can do whatever you want with this file.
+ * Copyright 2016 Eric Biggers
+ *
+ * Permission is hereby granted, free of charge, to any person
+ * obtaining a copy of this software and associated documentation
+ * files (the "Software"), to deal in the Software without
+ * restriction, including without limitation the rights to use,
+ * copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following
+ * conditions:
+ *
+ * The above copyright notice and this permission notice shall be
+ * included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+ * OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+ * HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+ * WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
  *
  * ----------------------------------------------------------------------------
  *
@@ -48,8 +67,8 @@
 
 #include "matchfinder_common.h"
 
-#define BT_MATCHFINDER_HASH3_ORDER 15
-#define BT_MATCHFINDER_HASH3_WAYS  1
+#define BT_MATCHFINDER_HASH3_ORDER 16
+#define BT_MATCHFINDER_HASH3_WAYS  2
 #define BT_MATCHFINDER_HASH4_ORDER 16
 
 #define BT_MATCHFINDER_TOTAL_HASH_LENGTH		\
@@ -60,10 +79,10 @@
 struct lz_match {
 
 	/* The number of bytes matched.  */
-	u32 length;
+	u16 length;
 
 	/* The offset back from the current position that was matched.  */
-	u32 offset;
+	u16 offset;
 };
 
 struct bt_matchfinder {
@@ -126,7 +145,7 @@ bt_matchfinder_advance_one_byte(struct bt_matchfinder * const restrict mf,
 				const u32 max_len,
 				const u32 nice_len,
 				const u32 max_search_depth,
-				u32 next_hashes[restrict 2],
+				u32 * const restrict next_hashes,
 				u32 * const restrict best_len_ret,
 				struct lz_match * restrict lz_matchptr,
 				const bool record_matches)
@@ -134,12 +153,9 @@ bt_matchfinder_advance_one_byte(struct bt_matchfinder * const restrict mf,
 	const u8 *in_next = in_base + cur_pos;
 	u32 depth_remaining = max_search_depth;
 	const s32 cutoff = cur_pos - MATCHFINDER_WINDOW_SIZE;
-	u32 next_seq4;
-	u32 next_seq3;
+	u32 next_hashseq;
 	u32 hash3;
 	u32 hash4;
-	STATIC_ASSERT(BT_MATCHFINDER_HASH3_WAYS >= 1 &&
-		      BT_MATCHFINDER_HASH3_WAYS <= 2);
 	s32 cur_node;
 #if BT_MATCHFINDER_HASH3_WAYS >= 2
 	s32 cur_node_2;
@@ -150,14 +166,16 @@ bt_matchfinder_advance_one_byte(struct bt_matchfinder * const restrict mf,
 	u32 len;
 	u32 best_len = 3;
 
-	next_seq4 = load_u32_unaligned(in_next + 1);
-	next_seq3 = loaded_u32_to_u24(next_seq4);
+	STATIC_ASSERT(BT_MATCHFINDER_HASH3_WAYS >= 1 &&
+		      BT_MATCHFINDER_HASH3_WAYS <= 2);
+
+	next_hashseq = get_unaligned_le32(in_next + 1);
 
 	hash3 = next_hashes[0];
 	hash4 = next_hashes[1];
 
-	next_hashes[0] = lz_hash(next_seq3, BT_MATCHFINDER_HASH3_ORDER);
-	next_hashes[1] = lz_hash(next_seq4, BT_MATCHFINDER_HASH4_ORDER);
+	next_hashes[0] = lz_hash(next_hashseq & 0xFFFFFF, BT_MATCHFINDER_HASH3_ORDER);
+	next_hashes[1] = lz_hash(next_hashseq, BT_MATCHFINDER_HASH4_ORDER);
 	prefetchw(&mf->hash3_tab[next_hashes[0]]);
 	prefetchw(&mf->hash4_tab[next_hashes[1]]);
 
@@ -206,8 +224,7 @@ bt_matchfinder_advance_one_byte(struct bt_matchfinder * const restrict mf,
 		matchptr = &in_base[cur_node];
 
 		if (matchptr[len] == in_next[len]) {
-			len = lz_extend(in_next, matchptr, len + 1,
-					(record_matches ? max_len : nice_len));
+			len = lz_extend(in_next, matchptr, len + 1, max_len);
 			if (!record_matches || len > best_len) {
 				if (record_matches) {
 					best_len = len;
@@ -320,7 +337,6 @@ static forceinline void
 bt_matchfinder_skip_position(struct bt_matchfinder *mf,
 			     const u8 *in_base,
 			     ptrdiff_t cur_pos,
-			     u32 max_len,
 			     u32 nice_len,
 			     u32 max_search_depth,
 			     u32 next_hashes[2])
@@ -329,7 +345,7 @@ bt_matchfinder_skip_position(struct bt_matchfinder *mf,
 	bt_matchfinder_advance_one_byte(mf,
 					in_base,
 					cur_pos,
-					max_len,
+					nice_len,
 					nice_len,
 					max_search_depth,
 					next_hashes,
