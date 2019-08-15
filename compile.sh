@@ -1,11 +1,13 @@
-g++ -O2 -fno-exceptions -fno-rtti -fPIC -c -o lzmasdk.o lib/lzmasdk.cpp
+#!/bin/bash
 
-gcc -O2 -std=c99 -DSTANDALONE -o 7razf applet/7razf.c applet/7razf_testdecode.c lib/zopfli/*.c lib/popt/*.c lib/zlib/*.c lib/memstream.c lib/zlibutil.c lib/miniz.c lib/slz.c lib/libdeflate/libdeflate.c lzmasdk.o -lsupc++ -lm -ldl
-gcc -O2 -std=c99 -DSTANDALONE -o 7bgzf applet/7bgzf.c lib/zopfli/*.c lib/popt/*.c lib/zlib/*.c lib/memstream.c lib/zlibutil.c lib/miniz.c lib/slz.c lib/libdeflate/libdeflate.c lzmasdk.o -lsupc++ -lm -ldl
-gcc -O2 -std=c99 -DSTANDALONE -o 7gzip applet/7gzip.c lib/zopfli/*.c lib/popt/*.c lib/zlib/*.c lib/memstream.c lib/zlibutil.c lib/miniz.c lib/slz.c lib/libdeflate/libdeflate.c lzmasdk.o -lsupc++ -lm -ldl
-gcc -O2 -std=c99 -DSTANDALONE -o 7png applet/7png.c lib/zopfli/*.c lib/popt/*.c lib/zlib/*.c lib/memstream.c lib/zlibutil.c lib/miniz.c lib/slz.c lib/libdeflate/libdeflate.c lzmasdk.o -lsupc++ -lm -ldl
+shopt -s nullglob
+if [ -z "${CC}" ]; then
+	CC="gcc"
+fi
 
-gcc -O2 -std=c99 -DSTANDALONE -o zlibrawstdio applet/zlibrawstdio.c lib/zopfli/*.c lib/popt/*.c lib/zlib/*.c lib/memstream.c lib/zlibutil.c lib/miniz.c lib/slz.c lib/libdeflate/libdeflate.c lzmasdk.o -lsupc++ -lm -ldl
-gcc -O2 -std=c99 -DSTANDALONE -o zlibrawstdio2 applet/zlibrawstdio2.c lib/zopfli/*.c lib/popt/*.c lib/zlib/*.c lib/memstream.c lib/zlibutil.c lib/miniz.c lib/slz.c lib/libdeflate/libdeflate.c lzmasdk.o -lsupc++ -lm -ldl
+for i in 7bgzf 7razf 7gzip 7png zlibrawstdio zlibrawstdio2
+do
+	${CC} -O2 -std=gnu99 -DSTANDALONE -o ${i} applet/${i}.c applet/${i}_*.c lib/zopfli/*.c lib/popt/*.c lib/zlib/*.c lib/memstream.c lib/zlibutil.c lib/miniz.c lib/slz.c lib/libdeflate/deflate_compress.c lib/libdeflate/aligned_malloc.c lib/lzmasdk.c -ldl
+done
 
-gcc -O2 -std=c99 -shared -fPIC -o 7bgzf.so bgzf_compress.c lib/zopfli/*.c lib/popt/*.c lib/zlib/*.c lib/memstream.c lib/zlibutil.c lib/miniz.c lib/slz.c lib/libdeflate/libdeflate.c lzmasdk.o -lsupc++ -lm -ldl
+${CC} -O2 -std=gnu99 -shared -fPIC -o 7bgzf.so bgzf_compress.c lib/zopfli/*.c lib/popt/*.c lib/zlib/*.c lib/memstream.c lib/zlibutil.c lib/miniz.c lib/slz.c lib/libdeflate/deflate_compress.c lib/libdeflate/aligned_malloc.c lib/lzmasdk.c -ldl

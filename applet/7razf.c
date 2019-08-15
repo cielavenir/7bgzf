@@ -36,10 +36,12 @@ void write64(void *p, const unsigned long long int n){
 	x[4]=(n>>32)&0xff,x[5]=(n>>40)&0xff,x[6]=(n>>48)&0xff,x[7]=(n>>56)&0xff;
 }
 
+#if 0
 void write32(void *p, const unsigned int n){
 	unsigned char *x=(unsigned char*)p;
 	x[0]=n&0xff,x[1]=(n>>8)&0xff,x[2]=(n>>16)&0xff,x[3]=(n>>24)&0xff;
 }
+#endif
 
 void write16(void *p, const unsigned short n){
 	unsigned char *x=(unsigned char*)p;

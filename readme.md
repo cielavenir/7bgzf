@@ -5,7 +5,7 @@
 
 ## Building Instruction
 - Execute compile.sh.
-    - 7bgzf is almost static; the dependency is only libc and libsupc++ (or libc++abi).
+    - 7bgzf is almost static; the dependency is only libc.
 - p7zip and htslib could be installed by system administration command.
 - 7bgzf.so can be injected into libhts.so using LD_PRELOAD environment variable.
     - However, since LD_PRELOAD utilizes procedure linkage table (PLT), samtools / bcftools need to link to libhts.so (not a).

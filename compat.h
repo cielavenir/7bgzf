@@ -63,6 +63,10 @@ typedef long long s64;
 	#define LLD "lld"
 	#define LLU "llu"
 	#define LLX "llx"
+	#include <dlfcn.h>
+	#define LoadLibraryA(filename) dlopen(filename,RTLD_NOW)
+	#define GetProcAddress dlsym
+	#define FreeLibrary dlclose
 #endif
 
 int sfilelength(const char *path);
