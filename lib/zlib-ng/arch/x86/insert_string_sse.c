@@ -1,5 +1,3 @@
-#pragma GCC push_options
-#pragma GCC target("sse4.2")
 #define X86_SSE4_2_CRC_HASH
 #define X86_SSE4_2_CRC_INTRIN
 /* insert_string_sse -- insert_string variant using SSE4.2's CRC instructions
@@ -21,7 +19,7 @@
  *    (except for the last MIN_MATCH-1 bytes of the input file).
  */
 #ifdef X86_SSE4_2_CRC_HASH
-ZLIB_INTERNAL Pos insert_string_sse(deflate_state *const s, const Pos str, unsigned int count) {
+ZLIB_INTERNAL __attribute__((target("sse4.2"))) Pos insert_string_sse(deflate_state *const s, const Pos str, unsigned int count) {
     Pos ret = 0;
     unsigned int idx;
     unsigned int *ip, val, h;
@@ -69,4 +67,3 @@ ZLIB_INTERNAL Pos insert_string_sse(deflate_state *const s, const Pos str, unsig
     return ret;
 }
 #endif
-#pragma GCC pop_options

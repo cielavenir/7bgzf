@@ -1,4 +1,3 @@
-#include "../../zconf-ng.h"
 /* insert_string_acle.c -- insert_string variant using ACLE's CRC instructions
  *
  * Copyright (C) 1995-2013 Jean-loup Gailly and Mark Adler

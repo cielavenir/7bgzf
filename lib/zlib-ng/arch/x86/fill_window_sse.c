@@ -1,5 +1,3 @@
-#pragma GCC push_options
-#pragma GCC target("sse2")
 #define X86_SSE2
 /*
  * Fill Window with SSE2-optimized hash shifting
@@ -21,7 +19,7 @@
 
 extern int read_buf(PREFIX3(stream) *strm, unsigned char *buf, unsigned size);
 
-ZLIB_INTERNAL void fill_window_sse(deflate_state *s) {
+ZLIB_INTERNAL __attribute__((target("sse2"))) void fill_window_sse(deflate_state *s) {
     const __m128i xmm_wsize = _mm_set1_epi16(s->w_size);
 
     register unsigned n;
@@ -176,4 +174,3 @@ ZLIB_INTERNAL void fill_window_sse(deflate_state *s) {
     Assert((unsigned long)s->strstart <= s->window_size - MIN_LOOKAHEAD, "not enough room for search");
 }
 #endif
-#pragma GCC pop_options

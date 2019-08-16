@@ -1,4 +1,3 @@
-#include "../../zconf-ng.h"
 /* dfltcc_inflate.c - IBM Z DEFLATE CONVERSION CALL decompression support. */
 
 /*

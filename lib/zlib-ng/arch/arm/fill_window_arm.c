@@ -1,4 +1,3 @@
-#include "../../zconf-ng.h"
 /* fill_window_arm.c -- Optimized hash table shifting for ARM with support for NEON instructions
  * Copyright (C) 2017 Mika T. Lindqvist
  *

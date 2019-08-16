@@ -1,5 +1,3 @@
-#pragma GCC push_options
-#pragma GCC target("sse4.2,pclmul")
 #define X86_PCLMULQDQ_CRC
 /*
  * Compute the CRC32 using a parallelized folding approach with the PCLMULQDQ 
@@ -28,7 +26,7 @@
 
 #include "crc_folding.h"
 
-ZLIB_INTERNAL void crc_fold_init(deflate_state *const s) {
+ZLIB_INTERNAL __attribute__((target("sse4.2,pclmul"))) void crc_fold_init(deflate_state *const s) {
     /* CRC_SAVE */
     _mm_storeu_si128((__m128i *)s->crc0 + 0, _mm_cvtsi32_si128(0x9db42487));
     _mm_storeu_si128((__m128i *)s->crc0 + 1, _mm_setzero_si128());
@@ -38,7 +36,7 @@ ZLIB_INTERNAL void crc_fold_init(deflate_state *const s) {
     s->strm->adler = 0;
 }
 
-static void fold_1(__m128i *xmm_crc0, __m128i *xmm_crc1, __m128i *xmm_crc2, __m128i *xmm_crc3) {
+static  __attribute__((target("sse4.2,pclmul"))) void fold_1(__m128i *xmm_crc0, __m128i *xmm_crc1, __m128i *xmm_crc2, __m128i *xmm_crc3) {
     const __m128i xmm_fold4 = _mm_set_epi32( 0x00000001, 0x54442bd4,
                                              0x00000001, 0xc6e41596);
     __m128i x_tmp3;
@@ -59,7 +57,7 @@ static void fold_1(__m128i *xmm_crc0, __m128i *xmm_crc1, __m128i *xmm_crc2, __m1
     *xmm_crc3 = _mm_castps_si128(ps_res);
 }
 
-static void fold_2(__m128i *xmm_crc0, __m128i *xmm_crc1, __m128i *xmm_crc2, __m128i *xmm_crc3) {
+static  __attribute__((target("sse4.2,pclmul"))) void fold_2(__m128i *xmm_crc0, __m128i *xmm_crc1, __m128i *xmm_crc2, __m128i *xmm_crc3) {
     const __m128i xmm_fold4 = _mm_set_epi32( 0x00000001, 0x54442bd4,
                                              0x00000001, 0xc6e41596);
     __m128i x_tmp3, x_tmp2;
@@ -88,7 +86,7 @@ static void fold_2(__m128i *xmm_crc0, __m128i *xmm_crc1, __m128i *xmm_crc2, __m1
     *xmm_crc3 = _mm_castps_si128(ps_res31);
 }
 
-static void fold_3(__m128i *xmm_crc0, __m128i *xmm_crc1, __m128i *xmm_crc2, __m128i *xmm_crc3) {
+static  __attribute__((target("sse4.2,pclmul"))) void fold_3(__m128i *xmm_crc0, __m128i *xmm_crc1, __m128i *xmm_crc2, __m128i *xmm_crc3) {
     const __m128i xmm_fold4 = _mm_set_epi32( 0x00000001, 0x54442bd4,
                                              0x00000001, 0xc6e41596);
     __m128i x_tmp3;
@@ -123,7 +121,7 @@ static void fold_3(__m128i *xmm_crc0, __m128i *xmm_crc1, __m128i *xmm_crc2, __m1
     *xmm_crc3 = _mm_castps_si128(ps_res32);
 }
 
-static void fold_4(__m128i *xmm_crc0, __m128i *xmm_crc1, __m128i *xmm_crc2, __m128i *xmm_crc3) {
+static  __attribute__((target("sse4.2,pclmul"))) void fold_4(__m128i *xmm_crc0, __m128i *xmm_crc1, __m128i *xmm_crc2, __m128i *xmm_crc3) {
     const __m128i xmm_fold4 = _mm_set_epi32( 0x00000001, 0x54442bd4,
                                              0x00000001, 0xc6e41596);
     __m128i x_tmp0, x_tmp1, x_tmp2, x_tmp3;
@@ -184,7 +182,7 @@ static const unsigned ALIGNED_(32) pshufb_shf_table[60] = {
     0x0201008f, 0x06050403, 0x0a090807, 0x0e0d0c0b  /* shl  1 (16 -15)/shr15*/
 };
 
-static void partial_fold(const size_t len, __m128i *xmm_crc0, __m128i *xmm_crc1, __m128i *xmm_crc2,
+static  __attribute__((target("sse4.2,pclmul"))) void partial_fold(const size_t len, __m128i *xmm_crc0, __m128i *xmm_crc1, __m128i *xmm_crc2,
                          __m128i *xmm_crc3, __m128i *xmm_crc_part) {
 
     const __m128i xmm_fold4 = _mm_set_epi32( 0x00000001, 0x54442bd4,
@@ -230,7 +228,7 @@ static void partial_fold(const size_t len, __m128i *xmm_crc0, __m128i *xmm_crc1,
     *xmm_crc3 = _mm_castps_si128(ps_res);
 }
 
-ZLIB_INTERNAL void crc_fold_copy(deflate_state *const s, unsigned char *dst, const unsigned char *src, long len) {
+ZLIB_INTERNAL  __attribute__((target("sse4.2,pclmul"))) void crc_fold_copy(deflate_state *const s, unsigned char *dst, const unsigned char *src, long len) {
     unsigned long algn_diff;
     __m128i xmm_t0, xmm_t1, xmm_t2, xmm_t3;
 
@@ -380,7 +378,7 @@ static const unsigned ALIGNED_(16) crc_mask2[4] = {
     0x00000000, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF
 };
 
-uint32_t ZLIB_INTERNAL crc_fold_512to32(deflate_state *const s) {
+ZLIB_INTERNAL __attribute__((target("sse4.2,pclmul"))) uint32_t crc_fold_512to32(deflate_state *const s) {
     const __m128i xmm_mask  = _mm_load_si128((__m128i *)crc_mask);
     const __m128i xmm_mask2 = _mm_load_si128((__m128i *)crc_mask2);
 
@@ -450,4 +448,3 @@ uint32_t ZLIB_INTERNAL crc_fold_512to32(deflate_state *const s) {
 }
 
 #endif
-#pragma GCC pop_options

@@ -1,4 +1,3 @@
-#include "../../zconf-ng.h"
 /* dfltcc_deflate.c - IBM Z DEFLATE CONVERSION CALL general support. */
 
 #include "../../zbuild.h"

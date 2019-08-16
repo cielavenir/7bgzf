@@ -1,4 +1,3 @@
-#include "../../zconf-ng.h"
 /* Copyright (C) 1995-2011, 2016 Mark Adler
  * Copyright (C) 2017 ARM Holdings Inc.
  * Author: Adenilson Cavalcanti <adenilson.cavalcanti@arm.com>

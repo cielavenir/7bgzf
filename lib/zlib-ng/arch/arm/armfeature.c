@@ -1,4 +1,3 @@
-#include "../../zconf-ng.h"
 #include "../../zutil.h"
 
 #if defined(__linux__)
