@@ -15,6 +15,7 @@ enum{
 	DEFLATE_MINIZ,
 	DEFLATE_SLZ,
 	DEFLATE_LIBDEFLATE,
+	DEFLATE_ZLIBNG,
 };
 
 int miniz_deflate(
@@ -49,7 +50,7 @@ int zopfli_deflate(
 	int level
 );
 
-int ZEXPORT zlib_deflate(
+int zlibng_deflate(
 	unsigned char *dest,
 	unsigned long *destLen,
 	const unsigned char *source,
@@ -57,7 +58,15 @@ int ZEXPORT zlib_deflate(
 	int level
 );
 
-int ZEXPORT zlib_inflate(
+int zlib_deflate(
+	unsigned char *dest,
+	unsigned long *destLen,
+	const unsigned char *source,
+	unsigned long sourceLen,
+	int level
+);
+
+int zlib_inflate(
 	unsigned char *dest,
 	unsigned long *destLen,
 	const unsigned char *source,

@@ -35,14 +35,12 @@ void write64(void *p, const unsigned long long int n){
 	x[0]=n&0xff,x[1]=(n>>8)&0xff,x[2]=(n>>16)&0xff,x[3]=(n>>24)&0xff,
 	x[4]=(n>>32)&0xff,x[5]=(n>>40)&0xff,x[6]=(n>>48)&0xff,x[7]=(n>>56)&0xff;
 }
-
 #if 0
 void write32(void *p, const unsigned int n){
 	unsigned char *x=(unsigned char*)p;
 	x[0]=n&0xff,x[1]=(n>>8)&0xff,x[2]=(n>>16)&0xff,x[3]=(n>>24)&0xff;
 }
 #endif
-
 void write16(void *p, const unsigned short n){
 	unsigned char *x=(unsigned char*)p;
 	x[0]=n&0xff,x[1]=(n>>8)&0xff;
@@ -262,11 +260,11 @@ static int _decompress(FILE *in, FILE *out){
 	if(!n){fprintf(stderr,"header is not gzip (possibly corrupted)\n");return 1;}
 	if(memcmp(buf+offset,"RAZF",4)){fprintf(stderr,"not RAZF\n");return 1;}
 	block_size=read16be(buf+offset+4+1);
-	if(fseek(in,-16,SEEK_END)==-1){fprintf(stderr,"input is not seekable\n");return 1;}
+	if(fseeko(in,-16,SEEK_END)==-1){fprintf(stderr,"input is not seekable\n");return 1;}
 	fread(buf+2048,1,16,in);
 	unsigned long long fsize=read64be(buf+2048);
 	unsigned long long block_offset=read64be(buf+2048+8);
-	fseek(in,block_offset,SEEK_SET);
+	fseeko(in,block_offset,SEEK_SET);
 	fread(buf,4,1,in);
 	int total_block=read32be(buf);
 	int binsize=(1LLU << 32)/block_size;
@@ -274,7 +272,7 @@ static int _decompress(FILE *in, FILE *out){
 	fread(buf,8,bins+1,in);
 	fread(buf+8*(bins+1),4,total_block,in);
 	write32be(buf+8*(bins+1)+4*total_block,block_offset);
-	fseek(in,offset+len,SEEK_SET);
+	fseeko(in,offset+len,SEEK_SET);
 	int i=-1;
 	int counter=offset+len;
 
@@ -316,7 +314,7 @@ int main(const int argc, const char **argv){
 int _7razf(const int argc, const char **argv){
 #endif
 	int cmode=0,mode=0;
-	int zlib=0,sevenzip=0,zopfli=0,miniz=0,slz=0,libdeflate=0;
+	int zlib=0,sevenzip=0,zopfli=0,miniz=0,slz=0,libdeflate=0,zlibng=0;
 	poptContext optCon;
 	int optc;
 
@@ -328,6 +326,7 @@ int _7razf(const int argc, const char **argv){
 		{ "slz",     's',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,    's',       "1-1 (default 1) slz", "level" },
 		{ "libdeflate",     'l',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,    'l',       "1-12 (default 6) libdeflate", "level" },
 		{ "7zip",     'S',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,    'S',       "1-9 (default 2) 7zip", "level" },
+		{ "zlibng",     'n',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,    'n',       "1-9 (default 6) zlibng", "level" },
 		{ "zopfli",     'Z',         POPT_ARG_INT, &zopfli,    0,       "zopfli", "numiterations" },
 		//{ "threshold",  't',         POPT_ARG_INT, &threshold, 0,       "compression threshold (in %, 10-100)", "threshold" },
 		{ "decompress", 'd',         POPT_ARG_NONE,            &mode,      0,       "decompress", NULL },
@@ -369,15 +368,21 @@ int _7razf(const int argc, const char **argv){
 				else sevenzip=2;
 				break;
 			}
+			case 'n':{
+				char *arg=poptGetOptArg(optCon);
+				if(arg)zlibng=strtol(arg,NULL,10),free(arg);
+				else zlibng=6;
+				break;
+			}
 		}
 	}
 
-	int level_sum=zlib+sevenzip+zopfli+miniz+slz+libdeflate;
+	int level_sum=zlib+sevenzip+zopfli+miniz+slz+libdeflate+zlibng;
 	if(
 		optc<-1 ||
-		(!mode&&!zlib&&!sevenzip&&!zopfli&&!miniz&&!slz&&!libdeflate) ||
-		(mode&&(zlib||sevenzip||zopfli||miniz||slz||libdeflate)) ||
-		(!mode&&(level_sum==zlib)+(level_sum==sevenzip)+(level_sum==zopfli)+(level_sum==miniz)+(level_sum==slz)+(level_sum==libdeflate)!=1)
+		(!mode&&!zlib&&!sevenzip&&!zopfli&&!miniz&&!slz&&!libdeflate&&!zlibng) ||
+		(mode&&(zlib||sevenzip||zopfli||miniz||slz||libdeflate||zlibng)) ||
+		(!mode&&(level_sum==zlib)+(level_sum==sevenzip)+(level_sum==zopfli)+(level_sum==miniz)+(level_sum==slz)+(level_sum==libdeflate)+(level_sum==zlibng)!=1)
 	){
 		poptPrintHelp(optCon, stderr, 0);
 		poptFreeContext(optCon);
@@ -433,6 +438,9 @@ int _7razf(const int argc, const char **argv){
 		}else if(libdeflate){
 			fprintf(stderr,"(libdeflate)\n");
 			ret=_compress(in,stdout,libdeflate,DEFLATE_LIBDEFLATE);
+		}else if(zlibng){
+			fprintf(stderr,"(zlibng)\n");
+			ret=_compress(stdin,stdout,zlibng,DEFLATE_ZLIBNG);
 		}
 		fclose(in);
 		return ret;

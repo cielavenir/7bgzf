@@ -71,7 +71,7 @@ static int _compress(FILE *in, FILE *out, int level, int method, int threshold){
 	lzmaCreateCoder(&coder,0x040108,1,level);
 	long long i=0;
 	for(;i<total_block;i++){
-		write32(buf+4*i,ftell(out));
+		write32(buf+4*i,ftello(out));
 		size_t readlen=fread(__decompbuf,1,header.block_size,in);
 		size_t compsize=COMPBUFLEN;
 
@@ -128,8 +128,8 @@ static int _compress(FILE *in, FILE *out, int level, int method, int threshold){
 		}
 		if((i+1)%256==0)fprintf(stderr,"%"LLD" / %"LLD"\r",i+1,total_block);
 	}
-	write32(buf+4*i,ftell(out));
-	fseek(out,sizeof(header),SEEK_SET);
+	write32(buf+4*i,ftello(out));
+	fseeko(out,sizeof(header),SEEK_SET);
 	fwrite(buf,1,4*(total_block+1),out);
 	fprintf(stderr,"%"LLD" / %"LLD" done.\n",i,total_block);
 	lzmaDestroyCoder(&coder);
@@ -184,7 +184,7 @@ int main(const int argc, const char **argv){
 int _7ciso(const int argc, const char **argv){
 #endif
 	int cmode=0,mode=0;
-	int zlib=0,sevenzip=0,zopfli=0,miniz=0,slz=0,libdeflate=0;
+	int zlib=0,sevenzip=0,zopfli=0,miniz=0,slz=0,libdeflate=0,zlibng=0;
 	int threshold=100;
 	poptContext optCon;
 	int optc;
@@ -197,6 +197,7 @@ int _7ciso(const int argc, const char **argv){
 		{ "slz",     's',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,    's',       "1-1 (default 1) slz", "level" },
 		{ "libdeflate",     'l',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,    'l',       "1-12 (default 6) libdeflate", "level" },
 		{ "7zip",     'S',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,    'S',       "1-9 (default 2) 7zip", "level" },
+		{ "zlibng",     'n',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,    'n',       "1-9 (default 6) zlibng", "level" },
 		{ "zopfli",     'Z',         POPT_ARG_INT, &zopfli,    0,       "zopfli", "numiterations" },
 		{ "threshold",  't',         POPT_ARG_INT, &threshold, 0,       "compression threshold (in %, 10-100)", "threshold" },
 		{ "decompress", 'd',         POPT_ARG_NONE,            &mode,      0,       "decompress", NULL },
@@ -238,15 +239,21 @@ int _7ciso(const int argc, const char **argv){
 				else sevenzip=2;
 				break;
 			}
+			case 'n':{
+				char *arg=poptGetOptArg(optCon);
+				if(arg)zlibng=strtol(arg,NULL,10),free(arg);
+				else zlibng=6;
+				break;
+			}
 		}
 	}
 
-	int level_sum=zlib+sevenzip+zopfli+miniz+slz+libdeflate;
+	int level_sum=zlib+sevenzip+zopfli+miniz+slz+libdeflate+zlibng;
 	if(
 		optc<-1 ||
-		(!mode&&!zlib&&!sevenzip&&!zopfli&&!miniz&&!slz&&!libdeflate) ||
-		(mode&&(zlib||sevenzip||zopfli||miniz||slz||libdeflate)) ||
-		(!mode&&(level_sum==zlib)+(level_sum==sevenzip)+(level_sum==zopfli)+(level_sum==miniz)+(level_sum==slz)+(level_sum==libdeflate)!=1)
+		(!mode&&!zlib&&!sevenzip&&!zopfli&&!miniz&&!slz&&!libdeflate&&!zlibng) ||
+		(mode&&(zlib||sevenzip||zopfli||miniz||slz||libdeflate||zlibng)) ||
+		(!mode&&(level_sum==zlib)+(level_sum==sevenzip)+(level_sum==zopfli)+(level_sum==miniz)+(level_sum==slz)+(level_sum==libdeflate)+(level_sum==zlibng)!=1)
 	){
 		poptPrintHelp(optCon, stderr, 0);
 		poptFreeContext(optCon);
@@ -302,6 +309,9 @@ int _7ciso(const int argc, const char **argv){
 		}else if(libdeflate){
 			fprintf(stderr,"(libdeflate)\n");
 			ret=_compress(in,out,libdeflate,DEFLATE_LIBDEFLATE,threshold);
+		}else if(zlibng){
+			fprintf(stderr,"(zlibng)\n");
+			ret=_compress(stdin,stdout,zlibng,DEFLATE_ZLIBNG,threshold);
 		}
 		fclose(in),fclose(out);
 		return ret;

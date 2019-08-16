@@ -78,6 +78,9 @@ int bgzf_compress(void *_dst, size_t *_dlen, const void *src, size_t slen, int l
 		if(!strcasecmp(smethod,"libdeflate")){
 			method=DEFLATE_LIBDEFLATE;
 		}
+		if(!strcasecmp(smethod,"zlibng")){
+			method=DEFLATE_ZLIBNG;
+		}
 	}
 
 	if(level<0){
@@ -87,6 +90,7 @@ int bgzf_compress(void *_dst, size_t *_dlen, const void *src, size_t slen, int l
 		if(method==DEFLATE_MINIZ)level=1;
 		if(method==DEFLATE_SLZ)level=1;
 		if(method==DEFLATE_LIBDEFLATE)level=6;
+		if(method==DEFLATE_ZLIBNG)level=6;
 	}
 
 	//compress
@@ -141,6 +145,13 @@ int bgzf_compress(void *_dst, size_t *_dlen, const void *src, size_t slen, int l
 		int r=libdeflate_deflate(dst,&dlen,src,slen,level);
 		if(r){
 			fprintf(stderr,"libdeflate_deflate %d\n",r);
+			return 1;
+		}
+	}
+	if(method==DEFLATE_ZLIBNG){
+		int r=zlibng_deflate(dst,&dlen,(const unsigned char*)src,slen,level);
+		if(r){
+			fprintf(stderr,"zng_deflate %d\n",r);
 			return 1;
 		}
 	}

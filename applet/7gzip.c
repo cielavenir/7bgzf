@@ -8,7 +8,6 @@ zlibrawstdio2: RFC 1951 (deflate)
 #include <stdio.h>
 #include <time.h>
 #include "../lib/zlib/zlib.h"
-#include "../lib/zlib/zutil.h"
 #include "../lib/lzma.h"
 
 #define DECOMPBUFLEN (1<<16)
@@ -109,7 +108,7 @@ static int _compress(FILE *fin,FILE *fout,int level){
 	z.zfree = Z_NULL;
 	z.opaque = Z_NULL;
 
-	if(deflateInit2(&z,level,Z_DEFLATED, MAX_WBITS+16, DEF_MEM_LEVEL, Z_DEFAULT_STRATEGY) != Z_OK){
+	if(deflateInit2(&z,level,Z_DEFLATED, MAX_WBITS+16, 9, Z_DEFAULT_STRATEGY) != Z_OK){
 		fprintf(stderr,"deflateInit: %s\n", (z.msg) ? z.msg : "???");
 		return 1;
 	}
@@ -175,18 +174,19 @@ int main(const int argc, const char **argv){
 #else
 int _7gzip(const int argc, const char **argv){
 #endif
-	char mode,level;
-	if(argc<2)goto argerror;
-	mode=argv[1][0],level=argv[1][1];
-	if(!mode)goto argerror;
-	if(mode=='-')mode=argv[1][1],level=argv[1][2];
-	if(mode!='e'&&mode!='c'&&mode!='d')goto argerror;
+	char mode='c',level='5';
+	if(argc>=2){
+		mode=argv[1][0],level=argv[1][1];
+		if(!mode)goto argerror;
+		if(mode=='-')mode=argv[1][1],level=argv[1][2];
+		if(mode!='e'&&mode!='c'&&mode!='d')goto argerror;
+	}
 	if(isatty(fileno(stdin))&&isatty(fileno(stdout)))goto argerror;
 
-	return mode=='d'?_decompress(stdin,stdout):_compress(stdin,stdout,level?level-'0':9);
+	return mode=='d'?_decompress(stdin,stdout):_compress(stdin,stdout,level?level-'0':5);
 
 argerror:
-	fprintf(stderr,"7gzip e/d < in > out\nYou can also use -e,-c,-d.\n");
+	fprintf(stderr,"7gzip [e[5]]/d < in > out\nYou can also use -e,-c,-d.\n");
 	if(!lzmaOpen7z())fprintf(stderr,"\nNote: 7-zip is AVAILABLE.\n"),lzmaClose7z();
 	else fprintf(stderr,"\nNote: 7-zip is NOT available.\n");
 	return -1;

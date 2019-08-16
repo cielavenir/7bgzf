@@ -332,7 +332,7 @@ int main(const int argc, const char **argv){
 int _7png(const int argc, const char **argv){
 #endif
 	int cmode=0,mode=0;
-	int zlib=0,sevenzip=0,zopfli=0,miniz=0,slz=0,libdeflate=0;
+	int zlib=0,sevenzip=0,zopfli=0,miniz=0,slz=0,libdeflate=0,zlibng=0;
 	poptContext optCon;
 	int optc;
 
@@ -344,7 +344,9 @@ int _7png(const int argc, const char **argv){
 		{ "slz",     's',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,    's',       "1-1 (default 1) slz", "level" },
 		{ "libdeflate",     'l',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,    'l',       "1-12 (default 6) libdeflate", "level" },
 		{ "7zip",     'S',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,    'S',       "1-9 (default 2) 7zip", "level" },
-		{ "zopfli",     'Z',         POPT_ARG_INT, &zopfli,    0,       "zopfli", "numiterations" },		//{ "threshold",  't',         POPT_ARG_INT, &threshold, 0,       "compression threshold (in %, 10-100)", "threshold" },
+		{ "zlibng",     'n',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,    'n',       "1-9 (default 6) zlibng", "level" },
+		{ "zopfli",     'Z',         POPT_ARG_INT, &zopfli,    0,       "zopfli", "numiterations" },
+		//{ "threshold",  't',         POPT_ARG_INT, &threshold, 0,       "compression threshold (in %, 10-100)", "threshold" },
 		{ "strip", 't',         POPT_ARG_NONE,            &mode,      0,       "strip", "strip unnecessary chunks" },
 		POPT_AUTOHELP,
 		POPT_TABLEEND,
@@ -384,15 +386,21 @@ int _7png(const int argc, const char **argv){
 				else sevenzip=2;
 				break;
 			}
+			case 'n':{
+				char *arg=poptGetOptArg(optCon);
+				if(arg)zlibng=strtol(arg,NULL,10),free(arg);
+				else zlibng=6;
+				break;
+			}
 		}
 	}
 
-	int level_sum=zlib+sevenzip+zopfli+miniz+slz+libdeflate;
+	int level_sum=zlib+sevenzip+zopfli+miniz+slz+libdeflate+zlibng;
 	if(
 		optc<-1 ||
-		(!mode&&!zlib&&!sevenzip&&!zopfli&&!miniz&&!slz&&!libdeflate)// ||
-		//(mode&&(zlib||sevenzip||zopfli||miniz||slz||libdeflate)) ||
-		//(!mode&&(level_sum==zlib)+(level_sum==sevenzip)+(level_sum==zopfli)+(level_sum==miniz)+(level_sum==slz)+(level_sum==libdeflate)!=1)
+		(!mode&&!zlib&&!sevenzip&&!zopfli&&!miniz&&!slz&&!libdeflate&&!zlibng)// ||
+		//(mode&&(zlib||sevenzip||zopfli||miniz||slz||libdeflate||zlibng)) ||
+		//(!mode&&(level_sum==zlib)+(level_sum==sevenzip)+(level_sum==zopfli)+(level_sum==miniz)+(level_sum==slz)+(level_sum==libdeflate)+(level_sum==zlibng)!=1)
 	){
 		poptPrintHelp(optCon, stderr, 0);
 		poptFreeContext(optCon);
@@ -433,6 +441,9 @@ int _7png(const int argc, const char **argv){
 	}else if(libdeflate){
 		fprintf(stderr,"(libdeflate)\n");
 		ret=_compress(stdin,stdout,libdeflate,DEFLATE_LIBDEFLATE,mode);
+	}else if(zlibng){
+		fprintf(stderr,"(zlibng)\n");
+		ret=_compress(stdin,stdout,zlibng,DEFLATE_ZLIBNG,mode);
 	}else if(mode){
 		fprintf(stderr,"(strip)\n");
 		ret=_compress(stdin,stdout,0,0,mode);

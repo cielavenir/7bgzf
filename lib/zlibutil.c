@@ -6,6 +6,7 @@
 #include "slz.h"
 #include "libdeflate/libdeflate.h"
 #include "zopfli/deflate.h"
+//#include "zlib-ng/zlib-ng.h"
 
 int miniz_deflate(
 	unsigned char *dest,
@@ -83,7 +84,7 @@ int zopfli_deflate(
 #endif
 }
 
-int ZEXPORT zlib_deflate(
+int zlib_deflate(
 	unsigned char *dest,
 	unsigned long *destLen,
 	const unsigned char *source,
@@ -117,7 +118,7 @@ int ZEXPORT zlib_deflate(
 	return deflateEnd(&z);
 }
 
-int ZEXPORT zlib_inflate(
+int zlib_inflate(
 	unsigned char *dest,
 	unsigned long *destLen,
 	const unsigned char *source,
