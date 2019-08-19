@@ -332,10 +332,10 @@ int _7ciso(const int argc, const char **argv){
 			ret=_compress(in,out,libdeflate,DEFLATE_LIBDEFLATE,threshold);
 		}else if(zlibng){
 			fprintf(stderr,"(zlibng)\n");
-			ret=_compress(stdin,stdout,zlibng,DEFLATE_ZLIBNG,threshold);
+			ret=_compress(in,out,zlibng,DEFLATE_ZLIBNG,threshold);
 		}else if(igzip){
 			fprintf(stderr,"(igzip)\n");
-			ret=_compress(stdin,stdout,igzip,DEFLATE_IGZIP,threshold);
+			ret=_compress(in,out,igzip,DEFLATE_IGZIP,threshold);
 		}
 		fclose(in),fclose(out);
 		return ret;

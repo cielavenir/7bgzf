@@ -461,10 +461,10 @@ int _7razf(const int argc, const char **argv){
 			ret=_compress(in,stdout,libdeflate,DEFLATE_LIBDEFLATE);
 		}else if(zlibng){
 			fprintf(stderr,"(zlibng)\n");
-			ret=_compress(stdin,stdout,zlibng,DEFLATE_ZLIBNG);
+			ret=_compress(in,stdout,zlibng,DEFLATE_ZLIBNG);
 		}else if(igzip){
 			fprintf(stderr,"(igzip)\n");
-			ret=_compress(stdin,stdout,igzip,DEFLATE_IGZIP);
+			ret=_compress(in,stdout,igzip,DEFLATE_IGZIP);
 		}
 		fclose(in);
 		return ret;
