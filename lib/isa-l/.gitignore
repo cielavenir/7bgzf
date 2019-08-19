@@ -23,6 +23,7 @@ libtool
 
 # Generated files
 isa-l.h
-/libisal.la
+libisal.la
 libisal.pc
 programs/igzip
+programs/igzip.exe
