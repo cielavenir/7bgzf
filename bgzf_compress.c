@@ -6,7 +6,12 @@
 #include <string.h>
 #include <strings.h>
 #include <stdlib.h>
+#ifdef _WIN32
+#include <malloc.h>
+#define alloca _alloca
+#else
 #include <alloca.h>
+#endif
 
 #include "lib/zlibutil.h"
 #include "lib/lzma.h"
