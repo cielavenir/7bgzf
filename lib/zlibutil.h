@@ -16,6 +16,7 @@ enum{
 	DEFLATE_SLZ,
 	DEFLATE_LIBDEFLATE,
 	DEFLATE_ZLIBNG,
+	DEFLATE_IGZIP,
 };
 
 int miniz_deflate(
@@ -51,6 +52,14 @@ int zopfli_deflate(
 );
 
 int zlibng_deflate(
+	unsigned char *dest,
+	unsigned long *destLen,
+	const unsigned char *source,
+	unsigned long sourceLen,
+	int level
+);
+
+int igzip_deflate(
 	unsigned char *dest,
 	unsigned long *destLen,
 	const unsigned char *source,
