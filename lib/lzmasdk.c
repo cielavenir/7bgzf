@@ -468,6 +468,7 @@ bool MakeSArchiveOpenCallbackPassword(SArchiveOpenCallbackPassword *self, const 
 	self->vt->Release = SArchiveOpenCallbackPassword_Release;
 	self->vt->SetTotal = SArchiveOpenCallbackPassword_SetTotal;
 	self->vt->SetCompleted = SArchiveOpenCallbackPassword_SetCompleted;
+	self->refs = 1;
 	return true;
 }
 
@@ -545,6 +546,7 @@ bool MakeSArchiveExtractCallbackBare(SArchiveExtractCallbackBare *self, IInArchi
 	self->vt->GetStream = SArchiveExtractCallbackBare_GetStream;
 	self->vt->PrepareOperation = SArchiveExtractCallbackBare_PrepareOperation;
 	self->vt->SetOperationResult = SArchiveExtractCallbackBare_SetOperationResult;
+	self->refs = 1;
 	return true;
 }
 
