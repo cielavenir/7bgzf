@@ -30,9 +30,15 @@ const IID IID_IArchiveExtractCallback_={0x23170F69,0x40C1,0x278A,{0x00,0x00,0x00
 const IID IID_IInArchive_={0x23170F69,0x40C1,0x278A,{0x00,0x00,0x00,0x06,0x00,0x60,0x00,0x00}};
 const IID IID_IArchiveUpdateCallback_={0x23170F69,0x40C1,0x278A,{0x00,0x00,0x00,0x06,0x00,0x80,0x00,0x00}};
 const IID IID_IOutArchive_={0x23170F69,0x40C1,0x278A,{0x00,0x00,0x00,0x06,0x00,0xA0,0x00,0x00}};
+const IID IID_ISetProperties_={0x23170F69,0x40C1,0x278A,{0x00,0x00,0x00,0x06,0x00,0x03,0x00,0x00}};
 
 static HRESULT WINAPI SInStreamFile_QueryInterface(void* _self, const GUID* iid, void** out_obj){
 	SInStreamFile* self = (SInStreamFile*)_self;
+	if(!memcmp(iid,&IID_IInStream_,sizeof(GUID))){
+		*out_obj = self;
+		self->vt->AddRef(self);
+		return S_OK;
+	}
 	*out_obj = NULL;
 	return E_NOINTERFACE;
 }
@@ -83,6 +89,11 @@ bool WINAPI MakeSInStreamFile(SInStreamFile *self, const char *fname){
 
 static HRESULT WINAPI SInStreamMem_QueryInterface(void* _self, const GUID* iid, void** out_obj){
 	SInStreamMem* self = (SInStreamMem*)_self;
+	if(!memcmp(iid,&IID_IInStream_,sizeof(GUID))){
+		*out_obj = self;
+		self->vt->AddRef(self);
+		return S_OK;
+	}
 	*out_obj = NULL;
 	return E_NOINTERFACE;
 }
@@ -133,6 +144,11 @@ bool MakeSInStreamMem(SInStreamMem *self, void *p, const unsigned int size){
 
 static HRESULT WINAPI SInStreamGeneric_QueryInterface(void* _self, const GUID* iid, void** out_obj){
 	SInStreamGeneric* self = (SInStreamGeneric*)_self;
+	if(!memcmp(iid,&IID_IInStream_,sizeof(GUID))){
+		*out_obj = self;
+		self->vt->AddRef(self);
+		return S_OK;
+	}
 	*out_obj = NULL;
 	return E_NOINTERFACE;
 }
@@ -192,6 +208,11 @@ bool MakeSInStreamGeneric(SInStreamGeneric *self, void *h, tRead pRead, tClose p
 
 static HRESULT WINAPI SOutStreamFile_QueryInterface(void* _self, const GUID* iid, void** out_obj){
 	SOutStreamFile* self = (SOutStreamFile*)_self;
+	if(!memcmp(iid,&IID_IOutStream_,sizeof(GUID))){
+		*out_obj = self;
+		self->vt->AddRef(self);
+		return S_OK;
+	}
 	*out_obj = NULL;
 	return E_NOINTERFACE;
 }
@@ -550,7 +571,107 @@ bool MakeSArchiveExtractCallbackBare(SArchiveExtractCallbackBare *self, IInArchi
 	return true;
 }
 
+static HRESULT WINAPI SArchiveUpdateCallbackBare_QueryInterface(void* _self, const GUID* iid, void** out_obj){
+	SArchiveExtractCallbackBare *self = (SArchiveExtractCallbackBare*)_self;
+	/*
+	if(!memcmp(iid,&IID_ICryptoGetTextPassword_,sizeof(GUID))){
+		*out_obj = &self->setpassword;
+		self->setpassword.vt->AddRef(&self->setpassword);
+		return S_OK;
+	}
+	*/
+	*out_obj = NULL;
+	return E_NOINTERFACE;
+}
 
+static u32 WINAPI SArchiveUpdateCallbackBare_AddRef(void* _self){
+	SArchiveUpdateCallbackBare *self = (SArchiveUpdateCallbackBare*)_self;
+	return ++self->refs;
+}
+
+static u32 WINAPI SArchiveUpdateCallbackBare_Release(void* _self){
+	SArchiveUpdateCallbackBare *self = (SArchiveUpdateCallbackBare*)_self;
+	if(--self->refs==0){
+		free(self->vt);
+		self->vt=NULL;
+	}
+	return self->refs;
+}
+
+static HRESULT WINAPI SArchiveUpdateCallbackBare_SetTotal(void* _self, const u64 total){
+	SArchiveExtractCallbackBare *self = (SArchiveExtractCallbackBare*)_self;
+	return S_OK;
+}
+
+static HRESULT WINAPI SArchiveUpdateCallbackBare_SetCompleted(void* _self, const u64 *completedValue){
+	SArchiveUpdateCallbackBare *self = (SArchiveUpdateCallbackBare*)_self;
+	return S_OK;
+}
+
+static HRESULT WINAPI SArchiveUpdateCallbackBare_GetUpdateItemInfo(void* _self, u32 index, s32 *newData, s32 *newProps, u32 *indexInArchive){
+	SArchiveUpdateCallbackBare *self = (SArchiveUpdateCallbackBare*)_self;
+	*newData = 1;
+	*newProps = 1;
+	*indexInArchive = -1;
+	return S_OK;
+}
+
+static HRESULT WINAPI SArchiveUpdateCallbackBare_GetProperty(void* _self, u32 index, PROPID propID, PROPVARIANT *value){
+	SArchiveUpdateCallbackBare *self = (SArchiveUpdateCallbackBare*)_self;
+	//printf("%d %d\n",index,propID);
+	if(propID == kpidPath){
+		value->vt = VT_BSTR;
+		value->bstrVal = SysAllocStringLen(NULL,1);
+		wcscpy(value->bstrVal,L"$");
+	}else if(propID == kpidIsDir || propID == kpidIsAnti){
+		value->vt = VT_BOOL;
+		value->boolVal = VARIANT_FALSE;
+	}else if(propID == kpidSize){
+		value->vt = VT_UI8;
+		value->ulVal = 1; ///
+	}else if(propID == kpidMTime){
+		value->vt = VT_FILETIME;
+	}else if(propID == kpidAttrib){
+		value->vt = VT_UI4;
+	}
+	return S_OK;
+}
+
+static HRESULT WINAPI SArchiveUpdateCallbackBare_GetStream(void* _self, u32 index, /*ISequentialInStream_*/IInStream_ **inStream){
+	SArchiveExtractCallbackBare *self = (SArchiveExtractCallbackBare*)_self;
+	*inStream = NULL;
+	//PROPVARIANT path;
+	//memset(&path,0,sizeof(PROPVARIANT));
+	self->lastIndex = index;
+	IInStream_* stream = (IInStream_*)calloc(1,sizeof(SInStreamFile));
+	MakeSInStreamFile((SInStreamFile*)stream,"/dev/null");
+	*inStream = stream; // WILL BE RELEASED AUTOMATICALLY.
+	//PropVariantClear(&path);
+	return S_OK;
+}
+
+static HRESULT WINAPI SArchiveUpdateCallbackBare_SetOperationResult(void* _self, s32 opRes){
+	SArchiveUpdateCallbackBare *self = (SArchiveUpdateCallbackBare*)_self;
+	return S_OK;
+}
+
+bool MakeSArchiveUpdateCallbackBare(SArchiveUpdateCallbackBare *self, IOutArchive_ *archiver){
+	self->vt = (IArchiveUpdateCallback_vt*)calloc(1,sizeof(IArchiveUpdateCallback_vt));
+	if(!self->vt)return false;
+	self->archiver = archiver;
+	self->lastIndex = -1;
+	self->vt->QueryInterface = SArchiveUpdateCallbackBare_QueryInterface;
+	self->vt->AddRef = SArchiveUpdateCallbackBare_AddRef;
+	self->vt->Release = SArchiveUpdateCallbackBare_Release;
+	self->vt->SetTotal = SArchiveUpdateCallbackBare_SetTotal;
+	self->vt->SetCompleted = SArchiveUpdateCallbackBare_SetCompleted;
+	self->vt->GetUpdateItemInfo = SArchiveUpdateCallbackBare_GetUpdateItemInfo;
+	self->vt->GetProperty = SArchiveUpdateCallbackBare_GetProperty;
+	self->vt->GetStream = SArchiveUpdateCallbackBare_GetStream;
+	self->vt->SetOperationResult = SArchiveUpdateCallbackBare_SetOperationResult;
+	self->refs = 1;
+	return true;
+}
 
 //Loading 7z.so
 typedef HRESULT (WINAPI*funcCreateObject)(const GUID*,const GUID*,void**);
@@ -678,6 +799,15 @@ int lzmaCreateArchiver(void **archiver,unsigned char arctype,int encode,int leve
 	GUID CLSID_CArchiveHandler;
 	lzmaGUIDSetArchiver(&CLSID_CArchiveHandler,arctype);
 	if(pCreateArchiver(&CLSID_CArchiveHandler, encode?&IID_IOutArchive_:&IID_IInArchive_, archiver)!=S_OK){*archiver=NULL;return 1;}
+	if(encode && level>=0){
+		// there are massive options in 7-zip; just support -mx=N for now.
+		ISetProperties_ *setprop;
+		(*(IOutArchive_**)archiver)->vt->QueryInterface(*archiver, &IID_ISetProperties_, (void**)&setprop);
+		wchar_t* OPTS[]={L"x"};
+		PROPVARIANT VAR[]={{VT_UI4,0,0,0,{0}}};
+		VAR[0].uintVal=level;
+		setprop->vt->SetProperties(setprop,OPTS,VAR,1);
+	}
 	return 0;
 }
 int lzmaDestroyArchiver(void **archiver,int encode){
@@ -713,6 +843,10 @@ int lzmaExtractArchive(void *archiver,const unsigned int* indices, unsigned int 
 	if(!h7z||!archiver)return -1;
 	return ((IInArchive_*)archiver)->vt->Extract(archiver,indices,numItems,testMode,(IArchiveExtractCallback_*)callback);
 }
+int lzmaUpdateArchive(void *archiver,void *writer,u32 numItems,void *callback){
+	if(!h7z||!archiver)return -1;
+	return ((IOutArchive_*)archiver)->vt->UpdateItems(archiver,(IOutStream_*)writer,numItems,(IArchiveUpdateCallback_*)callback);
+}
 
 //Coder API
 int lzmaCreateCoder(void **coder,unsigned long long int id,int encode,int level){
@@ -731,9 +865,9 @@ int lzmaCreateCoder(void **coder,unsigned long long int id,int encode,int level)
 #ifndef LZMA_SPECIAL_COMPRESSION_LEVEL
 	PROPID ID[]={NCoderPropID_kLevel,NCoderPropID_kEndMarker,NCoderPropID_kDictionarySize};
 	PROPVARIANT VAR[]={{VT_UI4,0,0,0,{0}},{VT_BOOL,0,0,0,{0}},{VT_UI4,0,0,0,{0}}};
-	VAR[0].ulVal=level;
+	VAR[0].uintVal=level;
 	VAR[1].boolVal=VARIANT_TRUE;
-	VAR[2].ulVal=1<<24;
+	VAR[2].uintVal=1<<24;
 	coderprop->vt->SetCoderProperties(coderprop,ID,VAR,id==0x030101 ? 3 : 1);
 #else
 	//Deflate(64)
@@ -986,8 +1120,29 @@ int lzmaUnloadUnrar(){
 #else
 HRESULT PropVariantClear(PROPVARIANT *pvar){
 	if(!pvar)return E_INVALIDARG;
-	if(pvar->vt == VT_BSTR)free(((u8*)pvar->bstrVal)-4);
+	if(pvar->vt == VT_BSTR)SysFreeString(pvar->bstrVal);
 	memset(pvar,0,sizeof(PROPVARIANT));
 	return S_OK;
+}
+BSTR SysAllocString(const OLECHAR *str){
+	u32 len = wcslen(str);
+	return SysAllocStringLen(str,len);
+}
+BSTR SysAllocStringLen(const OLECHAR *str,u32 len){
+	u8 *x = (BSTR)calloc(1,4+(len+1)*sizeof(OLECHAR));
+	write32(x,len);
+	BSTR ret = (BSTR)(x+4);
+	if(str){
+		int i=0;
+		for(;i<len;i++)ret[i]=str[i];
+	}
+	return ret;
+}
+void SysFreeString(BSTR str){
+	if(str)free(((u8*)str)-4);
+}
+u32 SysStringLen(BSTR str){
+	if(!str)return 0;
+	return read32(((u8*)str)-4);
 }
 #endif

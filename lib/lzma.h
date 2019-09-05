@@ -27,6 +27,10 @@ typedef int (*tClose)(void *);
 #else
 	#include "lzma_windows.h"
 	HRESULT PropVariantClear(PROPVARIANT *pvar);
+	BSTR SysAllocString(const OLECHAR *str);
+	BSTR SysAllocStringLen(const OLECHAR *str,u32 len);
+	void SysFreeString(BSTR str);
+	u32 SysStringLen(BSTR str);
 	// Reserved1 and Reserved2:
 	// CPP/Common/MyWindows.h (cf: https://forum.lazarus.freepascal.org/index.php/topic,42701.msg298820.html#msg298820)
 	#define LZMAIUnknownIMP HRESULT (WINAPI*QueryInterface)(void*, const GUID*, void**);u32 (WINAPI*AddRef)(void*);u32 (WINAPI*Release)(void*);void *Reserved1;void *Reserved2;
@@ -104,6 +108,7 @@ int lzmaCloseArchive(void *archiver);
 int lzmaGetArchiveFileNum(void *archiver,unsigned int *numItems);
 int lzmaGetArchiveFileProperty(void *archiver,unsigned int index,int kpid,PROPVARIANT *prop);
 int lzmaExtractArchive(void *archiver,const unsigned int* indices, unsigned int numItems, int testMode, void *callback);
+int lzmaUpdateArchive(void *archiver,void *writer,u32 numItems,void *callback);
 
 /*
 Coder API
@@ -380,6 +385,15 @@ typedef struct{
 
 typedef struct{
 	LZMAIUnknownIMP
+	HRESULT (WINAPI*SetProperties)(void* self, const wchar_t * const *names, const PROPVARIANT *values, u32 numProps);
+} ISetProperties_vt;
+
+typedef struct{
+	ISetProperties_vt *vt;
+} ISetProperties_;
+
+typedef struct{
+	LZMAIUnknownIMP
 	HRESULT (WINAPI*CryptoGetTextPassword)(void* self, BSTR *password);
 } ICryptoGetTextPassword_vt;
 
@@ -481,6 +495,15 @@ typedef struct{
 
 //password can be null
 bool MakeSArchiveExtractCallbackBare(SArchiveExtractCallbackBare *self, IInArchive_ *archiver, const char *password);
+
+typedef struct{
+	IArchiveUpdateCallback_vt *vt;
+	u32 refs;
+	IOutArchive_ *archiver;
+	u32 lastIndex;
+} SArchiveUpdateCallbackBare;
+
+bool MakeSArchiveUpdateCallbackBare(SArchiveUpdateCallbackBare *self, IOutArchive_ *archiver);
 
 int lzmaLoadUnrar();
 int lzmaUnloadUnrar();
