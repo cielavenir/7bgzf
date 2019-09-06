@@ -12,10 +12,12 @@ unsigned char buf[BUFLEN];
 #define COMPBUFLEN   (DECOMPBUFLEN|(DECOMPBUFLEN>>1))
 unsigned char __compbuf[COMPBUFLEN],__decompbuf[DECOMPBUFLEN];
 
+#if 0
 unsigned int read32(const void *p){
 	const unsigned char *x=(const unsigned char*)p;
 	return x[0]|(x[1]<<8)|(x[2]<<16)|((unsigned int)x[3]<<24);
 }
+#endif
 unsigned short read16(const void *p){
 	const unsigned char *x=(const unsigned char*)p;
 	return x[0]|(x[1]<<8);

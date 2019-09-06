@@ -23,9 +23,13 @@ typedef long long (*tTell)(void *);
 typedef int (*tClose)(void *);
 
 #if defined(_WIN32) || (!defined(__GNUC__) && !defined(__clang__))
+	#include <propidl.h> // PropVariantClear
+	#include <oleauto.h> // SysAllocStr etc
+	#define LZMA_UNUSED
 	#define LZMAIUnknownIMP HRESULT (WINAPI*QueryInterface)(void*, const GUID*, void**);u32 (WINAPI*AddRef)(void*);u32 (WINAPI*Release)(void*);
 #else
 	#include "lzma_windows.h"
+	#define LZMA_UNUSED __attribute__((unused))
 	HRESULT PropVariantClear(PROPVARIANT *pvar);
 	BSTR SysAllocString(const OLECHAR *str);
 	BSTR SysAllocStringLen(const OLECHAR *str,u32 len);
@@ -403,6 +407,15 @@ typedef struct{
 
 typedef struct{
 	LZMAIUnknownIMP
+	HRESULT (WINAPI*CryptoGetTextPassword2)(void* self, s32 *passwordIsDefined, BSTR *password);
+} ICryptoGetTextPassword2_vt;
+
+typedef struct{
+	ICryptoGetTextPassword2_vt *vt;
+} ICryptoGetTextPassword2_;
+
+typedef struct{
+	LZMAIUnknownIMP
 	HRESULT (WINAPI*UpdateItems)(void* self, /*ISequentialOutStream_*/IOutStream_ *outStream, u32 numItems, IArchiveUpdateCallback_ *updateCallback);
 	HRESULT (WINAPI*GetFileTimeType)(void* self, u32 *type);
 } IOutArchive_vt;
@@ -447,7 +460,7 @@ typedef struct{
 	FILE *f;
 } SOutStreamFile;
 
-bool MakeSOutStreamFile(SOutStreamFile *self, const char *fname);
+bool MakeSOutStreamFile(SOutStreamFile *self, const char *fname, bool readable);
 
 typedef struct{
 	IOutStream_vt *vt;
@@ -477,6 +490,15 @@ typedef struct{
 bool MakeSCryptoGetTextPasswordFixed(SCryptoGetTextPasswordFixed *self, const char *password);
 
 typedef struct{
+	ICryptoGetTextPassword2_vt *vt;
+	u32 refs;
+	char *password;
+} SCryptoGetTextPassword2Fixed;
+
+//password can be null
+bool MakeSCryptoGetTextPassword2Fixed(SCryptoGetTextPassword2Fixed *self, const char *password);
+
+typedef struct{
 	IArchiveOpenCallback_vt *vt;
 	u32 refs;
 	SCryptoGetTextPasswordFixed setpassword;
@@ -499,14 +521,18 @@ bool MakeSArchiveExtractCallbackBare(SArchiveExtractCallbackBare *self, IInArchi
 typedef struct{
 	IArchiveUpdateCallback_vt *vt;
 	u32 refs;
+	SCryptoGetTextPassword2Fixed setpassword;
 	IOutArchive_ *archiver;
 	u32 lastIndex;
 } SArchiveUpdateCallbackBare;
 
-bool MakeSArchiveUpdateCallbackBare(SArchiveUpdateCallbackBare *self, IOutArchive_ *archiver);
+bool MakeSArchiveUpdateCallbackBare(SArchiveUpdateCallbackBare *self, IOutArchive_ *archiver, const char *password);
 
 int lzmaLoadUnrar();
 int lzmaUnloadUnrar();
+
+unsigned long long FileTimeToUTC(const FILETIME in);
+FILETIME UTCToFileTime(const unsigned long long UTC);
 
 #ifdef __cplusplus
 }

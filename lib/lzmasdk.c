@@ -8,6 +8,11 @@
 #include "lzma.h"
 #include <string.h>
 
+unsigned int read32(const void *p){
+	const unsigned char *x=(const unsigned char*)p;
+	return x[0]|(x[1]<<8)|(x[2]<<16)|((unsigned int)x[3]<<24);
+}
+
 void write32(void *p, const unsigned int n){
 	unsigned char *x=(unsigned char*)p;
 	x[0]=n&0xff,x[1]=(n>>8)&0xff,x[2]=(n>>16)&0xff,x[3]=(n>>24)&0xff;
@@ -25,6 +30,7 @@ const IID IID_ICompressSetCoderProperties_={0x23170F69,0x40C1,0x278A,{0x00,0x00,
 const IID IID_ICompressCodecsInfo_={0x23170F69,0x40C1,0x278A,{0x00,0x00,0x00,0x04,0x00,0x60,0x00,0x00}};
 
 const IID IID_ICryptoGetTextPassword_={0x23170F69,0x40C1,0x278A,{0x00,0x00,0x00,0x05,0x00,0x10,0x00,0x00}};
+const IID IID_ICryptoGetTextPassword2_={0x23170F69,0x40C1,0x278A,{0x00,0x00,0x00,0x05,0x00,0x11,0x00,0x00}};
 
 const IID IID_IArchiveExtractCallback_={0x23170F69,0x40C1,0x278A,{0x00,0x00,0x00,0x06,0x00,0x20,0x00,0x00}};
 const IID IID_IInArchive_={0x23170F69,0x40C1,0x278A,{0x00,0x00,0x00,0x06,0x00,0x60,0x00,0x00}};
@@ -33,7 +39,7 @@ const IID IID_IOutArchive_={0x23170F69,0x40C1,0x278A,{0x00,0x00,0x00,0x06,0x00,0
 const IID IID_ISetProperties_={0x23170F69,0x40C1,0x278A,{0x00,0x00,0x00,0x06,0x00,0x03,0x00,0x00}};
 
 static HRESULT WINAPI SInStreamFile_QueryInterface(void* _self, const GUID* iid, void** out_obj){
-	SInStreamFile* self = (SInStreamFile*)_self;
+	LZMA_UNUSED SInStreamFile* self = (SInStreamFile*)_self;
 	if(!memcmp(iid,&IID_IInStream_,sizeof(GUID))){
 		*out_obj = self;
 		self->vt->AddRef(self);
@@ -44,12 +50,12 @@ static HRESULT WINAPI SInStreamFile_QueryInterface(void* _self, const GUID* iid,
 }
 
 static u32 WINAPI SInStreamFile_AddRef(void* _self){
-	SInStreamFile* self = (SInStreamFile*)_self;
+	LZMA_UNUSED SInStreamFile* self = (SInStreamFile*)_self;
 	return ++self->refs;
 }
 
 static u32 WINAPI SInStreamFile_Release(void* _self){
-	SInStreamFile* self = (SInStreamFile*)_self;
+	LZMA_UNUSED SInStreamFile* self = (SInStreamFile*)_self;
 	if(--self->refs==0){
 		free(self->vt);
 		self->vt=NULL;
@@ -60,14 +66,14 @@ static u32 WINAPI SInStreamFile_Release(void* _self){
 }
 
 static HRESULT WINAPI SInStreamFile_Read(void* _self, void *data, u32 size, u32 *processedSize){
-	SInStreamFile* self = (SInStreamFile*)_self;
+	LZMA_UNUSED SInStreamFile* self = (SInStreamFile*)_self;
 	u32 readlen = fread(data, 1, size, self->f);
 	if(processedSize)*processedSize = readlen;
 	return S_OK;
 }
 
 static HRESULT WINAPI SInStreamFile_Seek(void* _self, s64 offset, u32 seekOrigin, u64 *newPosition){
-	SInStreamFile* self = (SInStreamFile*)_self;
+	LZMA_UNUSED SInStreamFile* self = (SInStreamFile*)_self;
 	fseeko(self->f, offset, seekOrigin);
 	if(newPosition)*newPosition = ftello(self->f);
 	return S_OK;
@@ -88,7 +94,7 @@ bool WINAPI MakeSInStreamFile(SInStreamFile *self, const char *fname){
 }
 
 static HRESULT WINAPI SInStreamMem_QueryInterface(void* _self, const GUID* iid, void** out_obj){
-	SInStreamMem* self = (SInStreamMem*)_self;
+	LZMA_UNUSED SInStreamMem* self = (SInStreamMem*)_self;
 	if(!memcmp(iid,&IID_IInStream_,sizeof(GUID))){
 		*out_obj = self;
 		self->vt->AddRef(self);
@@ -99,12 +105,12 @@ static HRESULT WINAPI SInStreamMem_QueryInterface(void* _self, const GUID* iid, 
 }
 
 static u32 WINAPI SInStreamMem_AddRef(void* _self){
-	SInStreamMem* self = (SInStreamMem*)_self;
+	LZMA_UNUSED SInStreamMem* self = (SInStreamMem*)_self;
 	return ++self->refs;
 }
 
 static u32 WINAPI SInStreamMem_Release(void* _self){
-	SInStreamMem* self = (SInStreamMem*)_self;
+	LZMA_UNUSED SInStreamMem* self = (SInStreamMem*)_self;
 	if(--self->refs==0){
 		free(self->vt);
 		self->vt=NULL;
@@ -115,14 +121,14 @@ static u32 WINAPI SInStreamMem_Release(void* _self){
 }
 
 static HRESULT WINAPI SInStreamMem_Read(void* _self, void *data, u32 size, u32 *processedSize){
-	SInStreamMem* self = (SInStreamMem*)_self;
+	LZMA_UNUSED SInStreamMem* self = (SInStreamMem*)_self;
 	u32 readlen = mread(data, size, self->m);
 	if(processedSize)*processedSize = readlen;
 	return S_OK;
 }
 
 static HRESULT WINAPI SInStreamMem_Seek(void* _self, s64 offset, u32 seekOrigin, u64 *newPosition){
-	SInStreamMem* self = (SInStreamMem*)_self;
+	LZMA_UNUSED SInStreamMem* self = (SInStreamMem*)_self;
 	u64 pos = mseek(self->m, offset, seekOrigin);
 	if(newPosition)*newPosition = pos;
 	return S_OK;
@@ -143,7 +149,7 @@ bool MakeSInStreamMem(SInStreamMem *self, void *p, const unsigned int size){
 }
 
 static HRESULT WINAPI SInStreamGeneric_QueryInterface(void* _self, const GUID* iid, void** out_obj){
-	SInStreamGeneric* self = (SInStreamGeneric*)_self;
+	LZMA_UNUSED SInStreamGeneric* self = (SInStreamGeneric*)_self;
 	if(!memcmp(iid,&IID_IInStream_,sizeof(GUID))){
 		*out_obj = self;
 		self->vt->AddRef(self);
@@ -154,12 +160,12 @@ static HRESULT WINAPI SInStreamGeneric_QueryInterface(void* _self, const GUID* i
 }
 
 static u32 WINAPI SInStreamGeneric_AddRef(void* _self){
-	SInStreamGeneric* self = (SInStreamGeneric*)_self;
+	LZMA_UNUSED SInStreamGeneric* self = (SInStreamGeneric*)_self;
 	return ++self->refs;
 }
 
 static u32 WINAPI SInStreamGeneric_Release(void* _self){
-	SInStreamGeneric* self = (SInStreamGeneric*)_self;
+	LZMA_UNUSED SInStreamGeneric* self = (SInStreamGeneric*)_self;
 	if(--self->refs==0){
 		free(self->vt);
 		self->vt=NULL;
@@ -170,7 +176,7 @@ static u32 WINAPI SInStreamGeneric_Release(void* _self){
 }
 
 static HRESULT WINAPI SInStreamGeneric_Read(void* _self, void *data, u32 size, u32 *processedSize){
-	SInStreamGeneric* self = (SInStreamGeneric*)_self;
+	LZMA_UNUSED SInStreamGeneric* self = (SInStreamGeneric*)_self;
 	if(!self->h||!self->pRead)return E_FAIL;
 	int readlen=self->pRead(self->h,(char*)data,size);
 	if(processedSize)*processedSize=readlen;
@@ -178,7 +184,7 @@ static HRESULT WINAPI SInStreamGeneric_Read(void* _self, void *data, u32 size, u
 }
 
 static HRESULT WINAPI SInStreamGeneric_Seek(void* _self, s64 offset, u32 seekOrigin, u64 *newPosition){
-	SInStreamGeneric* self = (SInStreamGeneric*)_self;
+	LZMA_UNUSED SInStreamGeneric* self = (SInStreamGeneric*)_self;
 	if(!self->h||!self->pSeek)return E_FAIL;
 	if(self->pSeek(self->h,offset,seekOrigin))return E_FAIL;//errno;
 	if(newPosition){
@@ -207,7 +213,7 @@ bool MakeSInStreamGeneric(SInStreamGeneric *self, void *h, tRead pRead, tClose p
 }
 
 static HRESULT WINAPI SOutStreamFile_QueryInterface(void* _self, const GUID* iid, void** out_obj){
-	SOutStreamFile* self = (SOutStreamFile*)_self;
+	LZMA_UNUSED SOutStreamFile* self = (SOutStreamFile*)_self;
 	if(!memcmp(iid,&IID_IOutStream_,sizeof(GUID))){
 		*out_obj = self;
 		self->vt->AddRef(self);
@@ -218,12 +224,12 @@ static HRESULT WINAPI SOutStreamFile_QueryInterface(void* _self, const GUID* iid
 }
 
 static u32 WINAPI SOutStreamFile_AddRef(void* _self){
-	SOutStreamFile* self = (SOutStreamFile*)_self;
+	LZMA_UNUSED SOutStreamFile* self = (SOutStreamFile*)_self;
 	return ++self->refs;
 }
 
 static u32 WINAPI SOutStreamFile_Release(void* _self){
-	SOutStreamFile* self = (SOutStreamFile*)_self;
+	LZMA_UNUSED SOutStreamFile* self = (SOutStreamFile*)_self;
 	if(--self->refs==0){
 		free(self->vt);
 		self->vt=NULL;
@@ -234,33 +240,33 @@ static u32 WINAPI SOutStreamFile_Release(void* _self){
 }
 
 static HRESULT WINAPI SOutStreamFile_Write(void* _self, const void *data, u32 size, u32 *processedSize){
-	SOutStreamFile* self = (SOutStreamFile*)_self;
+	LZMA_UNUSED SOutStreamFile* self = (SOutStreamFile*)_self;
 	u32 writelen = fwrite(data, 1, size, self->f);
 	if(processedSize)*processedSize = writelen;
 	return S_OK;
 }
 
 static HRESULT WINAPI SOutStreamFile_Seek(void* _self, s64 offset, u32 seekOrigin, u64 *newPosition){
-	SOutStreamFile* self = (SOutStreamFile*)_self;
+	LZMA_UNUSED SOutStreamFile* self = (SOutStreamFile*)_self;
 	fseeko(self->f, offset, seekOrigin);
 	if(newPosition)*newPosition = ftello(self->f);
 	return S_OK;
 }
 
 static HRESULT WINAPI SOutStreamFile_SetSize(void* _self, u64 newSize){
-	SOutStreamFile* self = (SOutStreamFile*)_self;
+	LZMA_UNUSED SOutStreamFile* self = (SOutStreamFile*)_self;
 	ftruncate(fileno(self->f),newSize);
 	return S_OK;
 }
 
-bool MakeSOutStreamFile(SOutStreamFile *self, const char *fname){
-	/*
-	self->f = fopen(fname,"ab");
-	if(!self->f)return false;
-	fclose(self->f);
-	self->f = fopen(fname,"r+b");
-	*/
-	self->f = fopen(fname,"wb");
+bool MakeSOutStreamFile(SOutStreamFile *self, const char *fname, bool readable){
+	self->f = NULL;
+	if(readable){
+		self->f = fopen(fname,"r+b");
+	}
+	if(!self->f){
+		self->f = fopen(fname,"wb");
+	}
 	if(!self->f)return false;
 	self->vt = (IOutStream_vt*)calloc(1,sizeof(IOutStream_vt));
 	if(!self->vt)return false;
@@ -275,18 +281,18 @@ bool MakeSOutStreamFile(SOutStreamFile *self, const char *fname){
 }
 
 static HRESULT WINAPI SSequentialOutStreamMem_QueryInterface(void* _self, const GUID* iid, void** out_obj){
-	SSequentialOutStreamMem* self = (SSequentialOutStreamMem*)_self;
+	LZMA_UNUSED SSequentialOutStreamMem* self = (SSequentialOutStreamMem*)_self;
 	*out_obj = NULL;
 	return E_NOINTERFACE;
 }
 
 static u32 WINAPI SSequentialOutStreamMem_AddRef(void* _self){
-	SSequentialOutStreamMem* self = (SSequentialOutStreamMem*)_self;
+	LZMA_UNUSED SSequentialOutStreamMem* self = (SSequentialOutStreamMem*)_self;
 	return ++self->refs;
 }
 
 static u32 WINAPI SSequentialOutStreamMem_Release(void* _self){
-	SSequentialOutStreamMem* self = (SSequentialOutStreamMem*)_self;
+	LZMA_UNUSED SSequentialOutStreamMem* self = (SSequentialOutStreamMem*)_self;
 	if(--self->refs==0){
 		free(self->vt);
 		self->vt=NULL;
@@ -297,21 +303,21 @@ static u32 WINAPI SSequentialOutStreamMem_Release(void* _self){
 }
 
 static HRESULT WINAPI SSequentialOutStreamMem_Write(void* _self, const void *data, u32 size, u32 *processedSize){
-	SSequentialOutStreamMem* self = (SSequentialOutStreamMem*)_self;
+	LZMA_UNUSED SSequentialOutStreamMem* self = (SSequentialOutStreamMem*)_self;
 	u32 writelen = mwrite(data, size, self->m);
 	if(processedSize)*processedSize = writelen;
 	return S_OK;
 }
 
 static HRESULT WINAPI SSequentialOutStreamMem_Seek(void* _self, s64 offset, u32 seekOrigin, u64 *newPosition){
-	SSequentialOutStreamMem* self = (SSequentialOutStreamMem*)_self;
+	LZMA_UNUSED SSequentialOutStreamMem* self = (SSequentialOutStreamMem*)_self;
 	u64 pos = mseek(self->m, offset, seekOrigin);
 	if(newPosition)*newPosition = pos;
 	return S_OK;
 }
 
 static HRESULT WINAPI SSequentialOutStreamMem_SetSize(void* _self, u64 newSize){
-	SSequentialOutStreamMem* self = (SSequentialOutStreamMem*)_self;
+	LZMA_UNUSED SSequentialOutStreamMem* self = (SSequentialOutStreamMem*)_self;
 	return E_FAIL; // this is why declared as Sequential.
 }
 
@@ -331,18 +337,18 @@ bool MakeSSequentialOutStreamMem(SSequentialOutStreamMem *self, void *p, const u
 }
 
 static HRESULT WINAPI SSequentialOutStreamGeneric_QueryInterface(void* _self, const GUID* iid, void** out_obj){
-	SSequentialOutStreamGeneric* self = (SSequentialOutStreamGeneric*)_self;
+	LZMA_UNUSED SSequentialOutStreamGeneric* self = (SSequentialOutStreamGeneric*)_self;
 	*out_obj = NULL;
 	return E_NOINTERFACE;
 }
 
 static u32 WINAPI SSequentialOutStreamGeneric_AddRef(void* _self){
-	SSequentialOutStreamGeneric* self = (SSequentialOutStreamGeneric*)_self;
+	LZMA_UNUSED SSequentialOutStreamGeneric* self = (SSequentialOutStreamGeneric*)_self;
 	return ++self->refs;
 }
 
 static u32 WINAPI SSequentialOutStreamGeneric_Release(void* _self){
-	SSequentialOutStreamGeneric* self = (SSequentialOutStreamGeneric*)_self;
+	LZMA_UNUSED SSequentialOutStreamGeneric* self = (SSequentialOutStreamGeneric*)_self;
 	if(--self->refs==0){
 		free(self->vt);
 		self->vt=NULL;
@@ -353,7 +359,7 @@ static u32 WINAPI SSequentialOutStreamGeneric_Release(void* _self){
 }
 
 static HRESULT WINAPI SSequentialOutStreamGeneric_Write(void* _self, const void *data, u32 size, u32 *processedSize){
-	SSequentialOutStreamGeneric* self = (SSequentialOutStreamGeneric*)_self;
+	LZMA_UNUSED SSequentialOutStreamGeneric* self = (SSequentialOutStreamGeneric*)_self;
 	if(!self->h||!self->pWrite)return E_FAIL;
 	int readlen=self->pWrite(self->h,(char*)data,size);
 	if(processedSize)*processedSize=readlen;
@@ -361,7 +367,7 @@ static HRESULT WINAPI SSequentialOutStreamGeneric_Write(void* _self, const void 
 }
 
 static HRESULT WINAPI SSequentialOutStreamGeneric_Seek(void* _self, s64 offset, u32 seekOrigin, u64 *newPosition){
-	SSequentialOutStreamGeneric* self = (SSequentialOutStreamGeneric*)_self;
+	LZMA_UNUSED SSequentialOutStreamGeneric* self = (SSequentialOutStreamGeneric*)_self;
 	return E_FAIL;
 #if 0
 	if(!self->h||!self->pSeek)return E_FAIL;
@@ -375,7 +381,7 @@ static HRESULT WINAPI SSequentialOutStreamGeneric_Seek(void* _self, s64 offset, 
 }
 
 static HRESULT WINAPI SSequentialOutStreamGeneric_SetSize(void* _self, u64 newSize){
-	SSequentialOutStreamGeneric* self = (SSequentialOutStreamGeneric*)_self;
+	LZMA_UNUSED SSequentialOutStreamGeneric* self = (SSequentialOutStreamGeneric*)_self;
 	return E_FAIL;
 }
 
@@ -397,18 +403,18 @@ bool MakeSSequentialOutStreamGeneric(SSequentialOutStreamGeneric *self, void *h,
 }
 
 static HRESULT WINAPI SCryptoGetTextPasswordFixed_QueryInterface(void* _self, const GUID* iid, void** out_obj){
-	SCryptoGetTextPasswordFixed *self = (SCryptoGetTextPasswordFixed*)_self;
+	LZMA_UNUSED SCryptoGetTextPasswordFixed *self = (SCryptoGetTextPasswordFixed*)_self;
 	*out_obj = NULL;
 	return E_NOINTERFACE;
 }
 
 static u32 WINAPI SCryptoGetTextPasswordFixed_AddRef(void* _self){
-	SCryptoGetTextPasswordFixed *self = (SCryptoGetTextPasswordFixed*)_self;
+	LZMA_UNUSED SCryptoGetTextPasswordFixed *self = (SCryptoGetTextPasswordFixed*)_self;
 	return ++self->refs;
 }
 
 static u32 WINAPI SCryptoGetTextPasswordFixed_Release(void* _self){
-	SCryptoGetTextPasswordFixed *self = (SCryptoGetTextPasswordFixed*)_self;
+	LZMA_UNUSED SCryptoGetTextPasswordFixed *self = (SCryptoGetTextPasswordFixed*)_self;
 	if(--self->refs==0){
 		free(self->vt);
 		self->vt=NULL;
@@ -419,10 +425,10 @@ static u32 WINAPI SCryptoGetTextPasswordFixed_Release(void* _self){
 }
 
 static HRESULT WINAPI SCryptoGetTextPasswordFixed_CryptoGetTextPassword(void *_self, BSTR* password){
-	SCryptoGetTextPasswordFixed *self = (SCryptoGetTextPasswordFixed*)_self;
+	LZMA_UNUSED SCryptoGetTextPasswordFixed *self = (SCryptoGetTextPasswordFixed*)_self;
 	if(self->password){
-		u8* passwordStartAddr = (u8*)malloc(516);
-		*password = (BSTR)(passwordStartAddr+4);
+		*password = SysAllocStringLen(NULL,512);
+		u8* passwordStartAddr = ((u8*)*password)-4;
 		write32(passwordStartAddr, mbstowcs(*password, self->password, 512));
 	}
 	return S_OK;
@@ -444,8 +450,59 @@ bool MakeSCryptoGetTextPasswordFixed(SCryptoGetTextPasswordFixed *self, const ch
 	return true;
 }
 
+static HRESULT WINAPI SCryptoGetTextPassword2Fixed_QueryInterface(void* _self, const GUID* iid, void** out_obj){
+	LZMA_UNUSED SCryptoGetTextPassword2Fixed *self = (SCryptoGetTextPassword2Fixed*)_self;
+	*out_obj = NULL;
+	return E_NOINTERFACE;
+}
+
+static u32 WINAPI SCryptoGetTextPassword2Fixed_AddRef(void* _self){
+	LZMA_UNUSED SCryptoGetTextPassword2Fixed *self = (SCryptoGetTextPassword2Fixed*)_self;
+	return ++self->refs;
+}
+
+static u32 WINAPI SCryptoGetTextPassword2Fixed_Release(void* _self){
+	LZMA_UNUSED SCryptoGetTextPassword2Fixed *self = (SCryptoGetTextPassword2Fixed*)_self;
+	if(--self->refs==0){
+		free(self->vt);
+		self->vt=NULL;
+		free(self->password);
+		self->password=NULL;
+	}
+	return self->refs;
+}
+
+static HRESULT WINAPI SCryptoGetTextPassword2Fixed_CryptoGetTextPassword2(void *_self, s32 *passwordIsDefined, BSTR* password){
+	LZMA_UNUSED SCryptoGetTextPassword2Fixed *self = (SCryptoGetTextPassword2Fixed*)_self;
+	*passwordIsDefined = 0;
+	if(self->password){
+		*passwordIsDefined = 1;
+		*password = SysAllocStringLen(NULL,512);
+		u8* passwordStartAddr = ((u8*)*password)-4;
+		write32(passwordStartAddr, mbstowcs(*password, self->password, 512));
+	}
+	return S_OK;
+}
+
+bool MakeSCryptoGetTextPassword2Fixed(SCryptoGetTextPassword2Fixed *self, const char *password){
+	self->vt = (ICryptoGetTextPassword2_vt*)calloc(1,sizeof(ICryptoGetTextPassword2_vt));
+	if(!self->vt)return false;
+	self->password = NULL;
+	if(password){
+		self->password = (char*)malloc(strlen(password)+1);
+		strcpy(self->password, password);
+	}
+	self->vt->QueryInterface = SCryptoGetTextPassword2Fixed_QueryInterface;
+	self->vt->AddRef = SCryptoGetTextPassword2Fixed_AddRef;
+	self->vt->Release = SCryptoGetTextPassword2Fixed_Release;
+	self->vt->CryptoGetTextPassword2 = SCryptoGetTextPassword2Fixed_CryptoGetTextPassword2;
+	self->refs = 1;
+	return true;
+}
+
+
 static HRESULT WINAPI SArchiveOpenCallbackPassword_QueryInterface(void* _self, const GUID* iid, void** out_obj){
-	SArchiveOpenCallbackPassword *self = (SArchiveOpenCallbackPassword*)_self;
+	LZMA_UNUSED SArchiveOpenCallbackPassword *self = (SArchiveOpenCallbackPassword*)_self;
 	if(!memcmp(iid,&IID_ICryptoGetTextPassword_,sizeof(GUID))){
 		*out_obj = &self->setpassword;
 		self->setpassword.vt->AddRef(&self->setpassword);
@@ -456,12 +513,12 @@ static HRESULT WINAPI SArchiveOpenCallbackPassword_QueryInterface(void* _self, c
 }
 
 static u32 WINAPI SArchiveOpenCallbackPassword_AddRef(void* _self){
-	SArchiveOpenCallbackPassword *self = (SArchiveOpenCallbackPassword*)_self;
+	LZMA_UNUSED SArchiveOpenCallbackPassword *self = (SArchiveOpenCallbackPassword*)_self;
 	return ++self->refs;
 }
 
 static u32 WINAPI SArchiveOpenCallbackPassword_Release(void* _self){
-	SArchiveOpenCallbackPassword *self = (SArchiveOpenCallbackPassword*)_self;
+	LZMA_UNUSED SArchiveOpenCallbackPassword *self = (SArchiveOpenCallbackPassword*)_self;
 	if(--self->refs==0){
 		free(self->vt);
 		self->vt=NULL;
@@ -471,12 +528,12 @@ static u32 WINAPI SArchiveOpenCallbackPassword_Release(void* _self){
 }
 
 static HRESULT WINAPI SArchiveOpenCallbackPassword_SetTotal(void* _self, const u64 *files, const u64 *bytes){
-	SArchiveOpenCallbackPassword *self = (SArchiveOpenCallbackPassword*)_self;
+	LZMA_UNUSED SArchiveOpenCallbackPassword *self = (SArchiveOpenCallbackPassword*)_self;
 	return S_OK;
 }
 
 static HRESULT WINAPI SArchiveOpenCallbackPassword_SetCompleted(void* _self, const u64 *files, const u64 *bytes){
-	SArchiveOpenCallbackPassword *self = (SArchiveOpenCallbackPassword*)_self;
+	LZMA_UNUSED SArchiveOpenCallbackPassword *self = (SArchiveOpenCallbackPassword*)_self;
 	return S_OK;
 }
 
@@ -494,7 +551,7 @@ bool MakeSArchiveOpenCallbackPassword(SArchiveOpenCallbackPassword *self, const 
 }
 
 static HRESULT WINAPI SArchiveExtractCallbackBare_QueryInterface(void* _self, const GUID* iid, void** out_obj){
-	SArchiveExtractCallbackBare *self = (SArchiveExtractCallbackBare*)_self;
+	LZMA_UNUSED SArchiveExtractCallbackBare *self = (SArchiveExtractCallbackBare*)_self;
 	if(!memcmp(iid,&IID_ICryptoGetTextPassword_,sizeof(GUID))){
 		*out_obj = &self->setpassword;
 		self->setpassword.vt->AddRef(&self->setpassword);
@@ -505,12 +562,12 @@ static HRESULT WINAPI SArchiveExtractCallbackBare_QueryInterface(void* _self, co
 }
 
 static u32 WINAPI SArchiveExtractCallbackBare_AddRef(void* _self){
-	SArchiveExtractCallbackBare *self = (SArchiveExtractCallbackBare*)_self;
+	LZMA_UNUSED SArchiveExtractCallbackBare *self = (SArchiveExtractCallbackBare*)_self;
 	return ++self->refs;
 }
 
 static u32 WINAPI SArchiveExtractCallbackBare_Release(void* _self){
-	SArchiveExtractCallbackBare *self = (SArchiveExtractCallbackBare*)_self;
+	LZMA_UNUSED SArchiveExtractCallbackBare *self = (SArchiveExtractCallbackBare*)_self;
 	if(--self->refs==0){
 		free(self->vt);
 		self->vt=NULL;
@@ -519,17 +576,17 @@ static u32 WINAPI SArchiveExtractCallbackBare_Release(void* _self){
 }
 
 static HRESULT WINAPI SArchiveExtractCallbackBare_SetTotal(void* _self, const u64 total){
-	SArchiveExtractCallbackBare *self = (SArchiveExtractCallbackBare*)_self;
+	LZMA_UNUSED SArchiveExtractCallbackBare *self = (SArchiveExtractCallbackBare*)_self;
 	return S_OK;
 }
 
 static HRESULT WINAPI SArchiveExtractCallbackBare_SetCompleted(void* _self, const u64 *completedValue){
-	SArchiveExtractCallbackBare *self = (SArchiveExtractCallbackBare*)_self;
+	LZMA_UNUSED SArchiveExtractCallbackBare *self = (SArchiveExtractCallbackBare*)_self;
 	return S_OK;
 }
 
 static HRESULT WINAPI SArchiveExtractCallbackBare_GetStream(void* _self, u32 index, /*ISequentialOutStream_*/IOutStream_ **outStream, s32 askExtractMode){
-	SArchiveExtractCallbackBare *self = (SArchiveExtractCallbackBare*)_self;
+	LZMA_UNUSED SArchiveExtractCallbackBare *self = (SArchiveExtractCallbackBare*)_self;
 	*outStream = NULL;
 	PROPVARIANT path;
 	memset(&path,0,sizeof(PROPVARIANT));
@@ -537,19 +594,19 @@ static HRESULT WINAPI SArchiveExtractCallbackBare_GetStream(void* _self, u32 ind
 	lzmaGetArchiveFileProperty(self->archiver, index, kpidPath, &path);
 	//printf("%d\t%ls\n",index,path.bstrVal);
 	IOutStream_* stream = (IOutStream_*)calloc(1,sizeof(SOutStreamFile));
-	MakeSOutStreamFile((SOutStreamFile*)stream,"/dev/null");
+	MakeSOutStreamFile((SOutStreamFile*)stream,"/dev/null",false);
 	*outStream = stream; // WILL BE RELEASED AUTOMATICALLY.
 	PropVariantClear(&path);
 	return S_OK;
 }
 
 static HRESULT WINAPI SArchiveExtractCallbackBare_PrepareOperation(void* _self, s32 askExtractMode){
-	SArchiveExtractCallbackBare *self = (SArchiveExtractCallbackBare*)_self;
+	LZMA_UNUSED SArchiveExtractCallbackBare *self = (SArchiveExtractCallbackBare*)_self;
 	return S_OK;
 }
 
 static HRESULT WINAPI SArchiveExtractCallbackBare_SetOperationResult(void* _self, s32 opRes){
-	SArchiveExtractCallbackBare *self = (SArchiveExtractCallbackBare*)_self;
+	LZMA_UNUSED SArchiveExtractCallbackBare *self = (SArchiveExtractCallbackBare*)_self;
 	return S_OK;
 }
 
@@ -572,25 +629,23 @@ bool MakeSArchiveExtractCallbackBare(SArchiveExtractCallbackBare *self, IInArchi
 }
 
 static HRESULT WINAPI SArchiveUpdateCallbackBare_QueryInterface(void* _self, const GUID* iid, void** out_obj){
-	SArchiveExtractCallbackBare *self = (SArchiveExtractCallbackBare*)_self;
-	/*
-	if(!memcmp(iid,&IID_ICryptoGetTextPassword_,sizeof(GUID))){
+	LZMA_UNUSED SArchiveUpdateCallbackBare *self = (SArchiveUpdateCallbackBare*)_self;
+	if(!memcmp(iid,&IID_ICryptoGetTextPassword2_,sizeof(GUID))){
 		*out_obj = &self->setpassword;
 		self->setpassword.vt->AddRef(&self->setpassword);
 		return S_OK;
 	}
-	*/
 	*out_obj = NULL;
 	return E_NOINTERFACE;
 }
 
 static u32 WINAPI SArchiveUpdateCallbackBare_AddRef(void* _self){
-	SArchiveUpdateCallbackBare *self = (SArchiveUpdateCallbackBare*)_self;
+	LZMA_UNUSED SArchiveUpdateCallbackBare *self = (SArchiveUpdateCallbackBare*)_self;
 	return ++self->refs;
 }
 
 static u32 WINAPI SArchiveUpdateCallbackBare_Release(void* _self){
-	SArchiveUpdateCallbackBare *self = (SArchiveUpdateCallbackBare*)_self;
+	LZMA_UNUSED SArchiveUpdateCallbackBare *self = (SArchiveUpdateCallbackBare*)_self;
 	if(--self->refs==0){
 		free(self->vt);
 		self->vt=NULL;
@@ -599,17 +654,17 @@ static u32 WINAPI SArchiveUpdateCallbackBare_Release(void* _self){
 }
 
 static HRESULT WINAPI SArchiveUpdateCallbackBare_SetTotal(void* _self, const u64 total){
-	SArchiveExtractCallbackBare *self = (SArchiveExtractCallbackBare*)_self;
+	LZMA_UNUSED SArchiveExtractCallbackBare *self = (SArchiveExtractCallbackBare*)_self;
 	return S_OK;
 }
 
 static HRESULT WINAPI SArchiveUpdateCallbackBare_SetCompleted(void* _self, const u64 *completedValue){
-	SArchiveUpdateCallbackBare *self = (SArchiveUpdateCallbackBare*)_self;
+	LZMA_UNUSED SArchiveUpdateCallbackBare *self = (SArchiveUpdateCallbackBare*)_self;
 	return S_OK;
 }
 
 static HRESULT WINAPI SArchiveUpdateCallbackBare_GetUpdateItemInfo(void* _self, u32 index, s32 *newData, s32 *newProps, u32 *indexInArchive){
-	SArchiveUpdateCallbackBare *self = (SArchiveUpdateCallbackBare*)_self;
+	LZMA_UNUSED SArchiveUpdateCallbackBare *self = (SArchiveUpdateCallbackBare*)_self;
 	*newData = 1;
 	*newProps = 1;
 	*indexInArchive = -1;
@@ -617,7 +672,7 @@ static HRESULT WINAPI SArchiveUpdateCallbackBare_GetUpdateItemInfo(void* _self, 
 }
 
 static HRESULT WINAPI SArchiveUpdateCallbackBare_GetProperty(void* _self, u32 index, PROPID propID, PROPVARIANT *value){
-	SArchiveUpdateCallbackBare *self = (SArchiveUpdateCallbackBare*)_self;
+	LZMA_UNUSED SArchiveUpdateCallbackBare *self = (SArchiveUpdateCallbackBare*)_self;
 	//printf("%d %d\n",index,propID);
 	if(propID == kpidPath){
 		value->vt = VT_BSTR;
@@ -638,7 +693,7 @@ static HRESULT WINAPI SArchiveUpdateCallbackBare_GetProperty(void* _self, u32 in
 }
 
 static HRESULT WINAPI SArchiveUpdateCallbackBare_GetStream(void* _self, u32 index, /*ISequentialInStream_*/IInStream_ **inStream){
-	SArchiveExtractCallbackBare *self = (SArchiveExtractCallbackBare*)_self;
+	LZMA_UNUSED SArchiveExtractCallbackBare *self = (SArchiveExtractCallbackBare*)_self;
 	*inStream = NULL;
 	//PROPVARIANT path;
 	//memset(&path,0,sizeof(PROPVARIANT));
@@ -651,13 +706,14 @@ static HRESULT WINAPI SArchiveUpdateCallbackBare_GetStream(void* _self, u32 inde
 }
 
 static HRESULT WINAPI SArchiveUpdateCallbackBare_SetOperationResult(void* _self, s32 opRes){
-	SArchiveUpdateCallbackBare *self = (SArchiveUpdateCallbackBare*)_self;
+	LZMA_UNUSED SArchiveUpdateCallbackBare *self = (SArchiveUpdateCallbackBare*)_self;
 	return S_OK;
 }
 
-bool MakeSArchiveUpdateCallbackBare(SArchiveUpdateCallbackBare *self, IOutArchive_ *archiver){
+bool MakeSArchiveUpdateCallbackBare(SArchiveUpdateCallbackBare *self, IOutArchive_ *archiver, const char *password){
 	self->vt = (IArchiveUpdateCallback_vt*)calloc(1,sizeof(IArchiveUpdateCallback_vt));
 	if(!self->vt)return false;
+	MakeSCryptoGetTextPassword2Fixed(&self->setpassword,password);
 	self->archiver = archiver;
 	self->lastIndex = -1;
 	self->vt->QueryInterface = SArchiveUpdateCallbackBare_QueryInterface;
@@ -698,6 +754,8 @@ int lzmaOpen7z(){
 	h7z=LoadLibraryA("C:\\Program Files\\7-Zip\\7z.dll");
 	if(!h7z)h7z=LoadLibraryA("C:\\Program Files (x86)\\7-Zip\\7z.dll");
 	if(!h7z)h7z=LoadLibraryA("7z.dll"); // last resort using PATH
+	if(!h7z)h7z=LoadLibraryA("7z64.dll"); // lol...
+	if(!h7z)h7z=LoadLibraryA("7z32.dll"); // lol...
 #else
 	h7z=LoadLibraryA("/usr/lib/p7zip/7z.so"); //Generic
 	if(!h7z)h7z=LoadLibraryA("/usr/local/lib/p7zip/7z.so");
@@ -970,9 +1028,9 @@ int lzmaDestroyCoder(void **coder){
 	return 0;
 }
 
-static int mread2(void *h, char *p, int n){return mread(p,n,(memstream*)h);}
-static int mwrite2(void *h, const char *p, int n){return mwrite(p,n,(memstream*)h);}
-static int mclose2(void *h){return 0;}
+//static int mread2(void *h, char *p, int n){return mread(p,n,(memstream*)h);}
+//static int mwrite2(void *h, const char *p, int n){return mwrite(p,n,(memstream*)h);}
+//static int mclose2(void *h){return 0;}
 int lzmaCodeOneshot(void *coder, unsigned char *in, size_t isize, unsigned char *out, size_t *osize){
 		if(!h7z||!in||!out||!osize||!*osize)return -1;
 		//unsigned long long int dummy=0;
@@ -1020,18 +1078,18 @@ typedef struct{
 static SCompressCodecsInfoRar scoder; // for now expect to be placed BSS.
 
 static HRESULT SCompressCodecsInfoRar_QueryInterface(void* _self, const GUID* iid, void** out_obj){
-	SCompressCodecsInfoRar *self = (SCompressCodecsInfoRar*)_self;
+	LZMA_UNUSED SCompressCodecsInfoRar *self = (SCompressCodecsInfoRar*)_self;
 	*out_obj = NULL;
 	return E_NOINTERFACE;
 }
 
 static u32 WINAPI SCompressCodecsInfoRar_AddRef(void* _self){
-	SCompressCodecsInfoRar *self = (SCompressCodecsInfoRar*)_self;
+	LZMA_UNUSED SCompressCodecsInfoRar *self = (SCompressCodecsInfoRar*)_self;
 	return ++self->refs;
 }
 
 static u32 WINAPI SCompressCodecsInfoRar_Release(void* _self){
-	SCompressCodecsInfoRar *self = (SCompressCodecsInfoRar*)_self;
+	LZMA_UNUSED SCompressCodecsInfoRar *self = (SCompressCodecsInfoRar*)_self;
 	if(--self->refs==0){
 		pSetCodecs(NULL);
 		free(self->vt);
@@ -1047,22 +1105,22 @@ static u32 WINAPI SCompressCodecsInfoRar_Release(void* _self){
 }
 
 static HRESULT WINAPI SCompressCodecsInfoRar_GetNumMethods(void* _self, u32 *numMethods){
-	SCompressCodecsInfoRar *self = (SCompressCodecsInfoRar*)_self;
+	LZMA_UNUSED SCompressCodecsInfoRar *self = (SCompressCodecsInfoRar*)_self;
 	return self->pGetNumMethods(numMethods);
 }
 
 static HRESULT WINAPI SCompressCodecsInfoRar_GetProperty(void* _self, u32 index, PROPID propID, PROPVARIANT *value){
-	SCompressCodecsInfoRar *self = (SCompressCodecsInfoRar*)_self;
+	LZMA_UNUSED SCompressCodecsInfoRar *self = (SCompressCodecsInfoRar*)_self;
 	return self->pGetProperty(index,propID,value);
 }
 
 static HRESULT WINAPI SCompressCodecsInfoRar_CreateDecoder(void* _self, u32 index, const GUID *iid, void **coder){
-	SCompressCodecsInfoRar *self = (SCompressCodecsInfoRar*)_self;
+	LZMA_UNUSED SCompressCodecsInfoRar *self = (SCompressCodecsInfoRar*)_self;
 	return self->pCreateDecoder(index,iid,coder);
 }
 
 static HRESULT WINAPI SCompressCodecsInfoRar_CreateEncoder(void* _self, u32 index, const GUID *iid, void **coder){
-	SCompressCodecsInfoRar *self = (SCompressCodecsInfoRar*)_self;
+	LZMA_UNUSED SCompressCodecsInfoRar *self = (SCompressCodecsInfoRar*)_self;
 	return self->pCreateEncoder(index,iid,coder);
 }
 
@@ -1112,8 +1170,21 @@ int lzmaLoadUnrar(){
 }
 
 int lzmaUnloadUnrar(){
+	if(!scoder.refs)return 1;
 	scoder.vt->Release(&scoder);
 	return 0;
+}
+
+unsigned long long FileTimeToUTC(const FILETIME in){
+	return ((unsigned long long)in.dwHighDateTime*0x100000000+in.dwLowDateTime-0x19DB1DED53E8000)/10000000;
+}
+
+FILETIME UTCToFileTime(const unsigned long long UTC){
+	FILETIME ftime;
+	unsigned long long ll = UTC*10000000+0x19DB1DED53E8000;
+	ftime.dwLowDateTime  = (DWORD) ll;
+	ftime.dwHighDateTime = (DWORD)(ll >>32);
+	return ftime;
 }
 
 #if defined(_WIN32) || (!defined(__GNUC__) && !defined(__clang__))
@@ -1129,7 +1200,7 @@ BSTR SysAllocString(const OLECHAR *str){
 	return SysAllocStringLen(str,len);
 }
 BSTR SysAllocStringLen(const OLECHAR *str,u32 len){
-	u8 *x = (BSTR)calloc(1,4+(len+1)*sizeof(OLECHAR));
+	u8 *x = (u8*)calloc(1,4+(len+1)*sizeof(OLECHAR)); // needs to be calloc.
 	write32(x,len);
 	BSTR ret = (BSTR)(x+4);
 	if(str){

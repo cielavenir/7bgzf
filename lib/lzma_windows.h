@@ -66,35 +66,21 @@ typedef unsigned long long int UInt64;
 #define SUCCEEDED(Status) ((HRESULT)(Status) >= 0)
 #define FAILED(Status) ((HRESULT)(Status)<0)
 
-typedef unsigned long DWORD;
-typedef int WINBOOL,*PWINBOOL,*LPWINBOOL;
-typedef WINBOOL BOOL;
-typedef unsigned char BYTE;
-typedef BOOL *PBOOL,*LPBOOL;
-typedef unsigned short WORD;
-typedef float FLOAT;
-typedef FLOAT *PFLOAT;
-typedef BYTE *PBYTE,*LPBYTE;
-typedef int *PINT,*LPINT;
-typedef WORD *PWORD,*LPWORD;
-typedef long *LPLONG;
-typedef DWORD *PDWORD,*LPDWORD;
-typedef void *PVOID,*LPVOID;
-typedef CONST void *PCVOID,*LPCVOID;
-typedef int INT;
-typedef unsigned int UINT,*PUINT,*LPUINT;
-
 #ifndef VOID
 #define VOID void
 #endif
 typedef char CHAR;
 typedef short SHORT;
-typedef long LONG;
+typedef int LONG;
+typedef int INT;
 typedef CHAR CCHAR;
-typedef unsigned char UCHAR,*PUCHAR;
-typedef unsigned short USHORT,*PUSHORT;
-typedef unsigned long ULONG,*PULONG;
-typedef char *PSZ;
+typedef unsigned char UCHAR;
+typedef unsigned short USHORT;
+typedef unsigned int ULONG;
+typedef unsigned int UINT;
+
+typedef unsigned short WORD;
+typedef unsigned int DWORD;
 
 typedef LONG HRESULT;
 typedef ULONG PROPID;
@@ -110,7 +96,7 @@ typedef Int64 LONGLONG;
 typedef UInt64 ULONGLONG;
 typedef struct _LARGE_INTEGER { LONGLONG QuadPart; } LARGE_INTEGER;
 typedef struct _ULARGE_INTEGER { ULONGLONG QuadPart; } ULARGE_INTEGER;
-typedef unsigned short VARTYPE;
+typedef WORD VARTYPE;
 typedef WORD PROPVAR_PAD1;
 typedef WORD PROPVAR_PAD2;
 typedef WORD PROPVAR_PAD3;
