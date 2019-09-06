@@ -754,7 +754,7 @@ int lzmaOpen7z(){
 	h7z=LoadLibraryA("C:\\Program Files\\7-Zip\\7z.dll");
 	if(!h7z)h7z=LoadLibraryA("C:\\Program Files (x86)\\7-Zip\\7z.dll");
 	if(!h7z)h7z=LoadLibraryA("7z.dll"); // last resort using PATH
-	if(!h7z)h7z=LoadLibraryA("7z64.dll"); // lol...
+	if(!h7z)h7z=LoadLibraryA("7z64.dll"); // lol... (for example, could be useful for Wine testing)
 	if(!h7z)h7z=LoadLibraryA("7z32.dll"); // lol...
 #else
 	h7z=LoadLibraryA("/usr/lib/p7zip/7z.so"); //Generic
