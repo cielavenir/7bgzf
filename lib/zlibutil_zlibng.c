@@ -1,4 +1,5 @@
 #include "zlib-ng/zlib-ng.h"
+#include "zlib-ng/zutil.h" // DEF_MEM_LEVEL
 
 int zlibng_deflate(
 	unsigned char *dest,
@@ -17,7 +18,7 @@ int zlibng_deflate(
 	z.opaque = Z_NULL;
 
 	if((status=zng_deflateInit2(
-		&z, level , Z_DEFLATED, -MAX_WBITS, level, Z_DEFAULT_STRATEGY
+		&z, level , Z_DEFLATED, -MAX_WBITS, DEF_MEM_LEVEL, Z_DEFAULT_STRATEGY
 	)) != Z_OK){
 		return status;
 	}

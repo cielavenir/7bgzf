@@ -5,7 +5,7 @@
 // parallel compression is supported.
 // parallel decompression is supported.
 
-// enable fallback explained in https://github.com/lh3/samtools/blob/master/bgzf.c#L318 , which is incompatible with multithread
+// enable fallback explained in https://github.com/lh3/samtools/blob/master/bgzf.c#L318 (only if nthreads==1)
 #define BGZF_BUFSHORTAGE_FALLBACK
 
 #ifdef STANDALONE
@@ -116,7 +116,7 @@ redo:;
 		for(;j<nthreads;j++){
 			zlibutil_buffer *zlibbuf;
 			if(!zlibbuf_main_thread){
-				zlibbuf = zlibutil_buffer_allocate(block_size|(block_size>>1), block_size);
+				zlibbuf = zlibutil_buffer_allocate(block_size+(block_size>>1), block_size); // bit-or is invalid here
 				if(offset)memcpy(zlibbuf->source,offsetbuffer,offset);
 				zlibbuf->sourceLen=fread(zlibbuf->source+offset,1,block_size-offset,in);
 				if(zlibbuf->sourceLen==-1){zlibutil_buffer_free(zlibbuf);break;}

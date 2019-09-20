@@ -89,7 +89,7 @@ static int _compress(FILE *in, FILE *out, int level, int method, int nthreads){
 		zlibutil_buffer *zlibbuf_main_thread;
 		int j=0;
 		for(;i+j<total_block && j<nthreads;j++){
-			zlibutil_buffer *zlibbuf = zlibutil_buffer_allocate(DAX_BLOCK_SIZE|(DAX_BLOCK_SIZE>>1), DAX_BLOCK_SIZE);
+			zlibutil_buffer *zlibbuf = zlibutil_buffer_allocate(DAX_BLOCK_SIZE+(DAX_BLOCK_SIZE>>1), DAX_BLOCK_SIZE);
 			zlibbuf->sourceLen=fread(zlibbuf->source,1,DAX_BLOCK_SIZE,in);
 			if(zlibbuf->sourceLen==-1)zlibbuf->sourceLen=0;
 			if(zlibbuf->sourceLen==0){zlibutil_buffer_free(zlibbuf);break;}

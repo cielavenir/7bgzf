@@ -4,6 +4,7 @@
 #include "zlibutil.h"
 #include "miniz.h"
 #include "slz.h"
+#include "zlib/zutil.h" // DEF_MEM_LEVEL
 #include "libdeflate/libdeflate.h"
 #include "zopfli/deflate.h"
 #include "lzma.h"
@@ -178,7 +179,7 @@ int zlib_deflate(
 	z.opaque = Z_NULL;
 
 	if((status=deflateInit2(
-		&z, level , Z_DEFLATED, -MAX_WBITS, level, Z_DEFAULT_STRATEGY
+		&z, level , Z_DEFLATED, -MAX_WBITS, DEF_MEM_LEVEL, Z_DEFAULT_STRATEGY
 	)) != Z_OK){
 		return status;
 	}
@@ -252,14 +253,22 @@ zlibutil_buffer *zlibutil_buffer_code(zlibutil_buffer *zlibbuf){
 			zlibbuf->dest+=2;
 		}
 		zlibbuf->ret = ((zlibutil_code_enc)zlibbuf->func)(zlibbuf->dest,&zlibbuf->destLen,zlibbuf->source,zlibbuf->sourceLen,zlibbuf->level);
-		if(zlibbuf->rfc1950 && !zlibbuf->ret){
-			write32be(zlibbuf->dest+zlibbuf->destLen,adler32(1,zlibbuf->source,zlibbuf->sourceLen));
+		if(zlibbuf->rfc1950){
 			zlibbuf->dest-=2;
-			zlibbuf->dest[0]=0x78;
-			zlibbuf->dest[1]=0xda;
-			zlibbuf->destLen+=6;
+			if(!zlibbuf->ret){
+				write32be(zlibbuf->dest+zlibbuf->destLen,adler32(1,zlibbuf->source,zlibbuf->sourceLen));
+				zlibbuf->dest[0]=0x78;
+				zlibbuf->dest[1]=0xda;
+				zlibbuf->destLen+=6;
+			}
 		}
 	}
 	return zlibbuf;
 }
-void zlibutil_buffer_free(zlibutil_buffer* zlibbuf){if(zlibbuf){free(zlibbuf->dest);zlibbuf->dest=NULL;free(zlibbuf->source);zlibbuf->source=NULL;free(zlibbuf);}}
+void zlibutil_buffer_free(zlibutil_buffer* zlibbuf){
+	if(zlibbuf){
+		free(zlibbuf->dest);zlibbuf->dest=NULL;
+		free(zlibbuf->source);zlibbuf->source=NULL;
+		free(zlibbuf);
+	}
+}

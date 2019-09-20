@@ -204,7 +204,7 @@ static int _compress(FILE *in, FILE *out, int level, int method, int nthreads){
 		zlibutil_buffer *zlibbuf_main_thread;
 		int j=0;
 		for(;i+j<total_block && j<nthreads;j++){
-			zlibutil_buffer *zlibbuf = zlibutil_buffer_allocate(block_size|(block_size>>1), block_size);
+			zlibutil_buffer *zlibbuf = zlibutil_buffer_allocate(block_size+(block_size>>1), block_size);
 			zlibbuf->sourceLen=fread(zlibbuf->source,1,block_size,in);
 			if(zlibbuf->sourceLen==-1)zlibbuf->sourceLen=0;
 			if(zlibbuf->sourceLen==0){zlibutil_buffer_free(zlibbuf);break;}
