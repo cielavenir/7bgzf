@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # CC=arm-linux-androideabi-gcc CFLAGS="-mthumb -march=armv7-a -mfloat-abi=softfp -mfpu=neon" arch=noarch host_cpu=base_aliases
-# CC=i686-w64-mingw32-gcc LIBS="-Wl,-Bstatic,--whole-archive -lwinpthread -Wl,--no-whole-archive,-Bdynamic -lole32 -loleaut32" CFLAGS="-mmmx -msse -msse2" arch=noarch host_cpu=base_aliases ZLIBNG_X86=1
-# CC=x86_64-w64-mingw32-gcc LIBS="-Wl,-Bstatic,--whole-archive -lwinpthread -Wl,--no-whole-archive,-Bdynamic -lole32 -loleaut32" CFLAGS="-march=core2 -mfpmath=sse -mmmx -msse -msse2 -msse3 -mno-ssse3" arch=mingw host_cpu=x86_64 ZLIBNG_X86=1
+# CC=i686-w64-mingw32-gcc LIBS="-static-libgcc -Wl,-Bstatic,--whole-archive -lwinpthread -Wl,--no-whole-archive,-Bdynamic -lole32 -loleaut32" CFLAGS="-mmmx -msse -msse2" arch=noarch host_cpu=base_aliases ZLIBNG_X86=1
+# CC=x86_64-w64-mingw32-gcc LIBS="-static-libgcc -Wl,-Bstatic,--whole-archive -lwinpthread -Wl,--no-whole-archive,-Bdynamic -lole32 -loleaut32" CFLAGS="-march=core2 -mfpmath=sse -mmmx -msse -msse2 -msse3 -mno-ssse3" arch=mingw host_cpu=x86_64 ZLIBNG_X86=1
 
 shopt -s nullglob
 if [ -z "${CC}" ]; then
