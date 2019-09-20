@@ -132,7 +132,7 @@ Coder API
 */
 int lzmaCreateCoder(void **coder,unsigned long long int id,int encode,int level);
 int lzmaDestroyCoder(void **coder);
-int lzmaCodeOneshot(void *coder, unsigned char *in, size_t isize, unsigned char *out, size_t *osize);
+int lzmaCodeOneshot(void *coder, const unsigned char *in, size_t isize, unsigned char *out, size_t *osize);
 int lzmaCodeCallback(void *coder, void *hin, tRead pRead_in, tClose pClose_in, void *hout, tWrite pWrite_out, tClose pClose_out);
 
 /// 7z.so interface extracted from LZMA SDK CPP/7zip ///

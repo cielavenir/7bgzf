@@ -243,6 +243,7 @@ static HRESULT WINAPI SOutStreamFile_Write(void* _self, const void *data, u32 si
 	LZMA_UNUSED SOutStreamFile* self = (SOutStreamFile*)_self;
 	u32 writelen = fwrite(data, 1, size, self->f);
 	if(processedSize)*processedSize = writelen;
+	if(size&&!writelen)return E_FAIL;
 	return S_OK;
 }
 
@@ -306,6 +307,7 @@ static HRESULT WINAPI SSequentialOutStreamMem_Write(void* _self, const void *dat
 	LZMA_UNUSED SSequentialOutStreamMem* self = (SSequentialOutStreamMem*)_self;
 	u32 writelen = mwrite(data, size, self->m);
 	if(processedSize)*processedSize = writelen;
+	if(size&&!writelen)return E_FAIL;
 	return S_OK;
 }
 
@@ -361,8 +363,9 @@ static u32 WINAPI SSequentialOutStreamGeneric_Release(void* _self){
 static HRESULT WINAPI SSequentialOutStreamGeneric_Write(void* _self, const void *data, u32 size, u32 *processedSize){
 	LZMA_UNUSED SSequentialOutStreamGeneric* self = (SSequentialOutStreamGeneric*)_self;
 	if(!self->h||!self->pWrite)return E_FAIL;
-	int readlen=self->pWrite(self->h,(char*)data,size);
-	if(processedSize)*processedSize=readlen;
+	int writelen=self->pWrite(self->h,(char*)data,size);
+	if(processedSize)*processedSize=writelen;
+	if(size&&!writelen)return E_FAIL;
 	return S_OK;
 }
 
@@ -1031,11 +1034,11 @@ int lzmaDestroyCoder(void **coder){
 //static int mread2(void *h, char *p, int n){return mread(p,n,(memstream*)h);}
 //static int mwrite2(void *h, const char *p, int n){return mwrite(p,n,(memstream*)h);}
 //static int mclose2(void *h){return 0;}
-int lzmaCodeOneshot(void *coder, unsigned char *in, size_t isize, unsigned char *out, size_t *osize){
+int lzmaCodeOneshot(void *coder, const unsigned char *in, size_t isize, unsigned char *out, size_t *osize){
 		if(!h7z||!in||!out||!osize||!*osize)return -1;
 		//unsigned long long int dummy=0;
 		SInStreamMem sin;
-		MakeSInStreamMem(&sin,in,isize);
+		MakeSInStreamMem(&sin,(void*)in,isize);
 		SSequentialOutStreamMem sout;
 		MakeSSequentialOutStreamMem(&sout,out,*osize);
 		HRESULT r=((ICompressCoder_*)coder)->vt->Code(coder,(IInStream_*)&sin, (IOutStream_*)&sout, (UINT64*)&isize, (UINT64*)osize, NULL);
