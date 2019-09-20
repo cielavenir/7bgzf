@@ -2,9 +2,9 @@
 
 int zlibng_deflate(
 	unsigned char *dest,
-	unsigned long *destLen,
+	size_t *destLen,
 	const unsigned char *source,
-	unsigned long sourceLen,
+	size_t sourceLen,
 	int level
 ){
 #ifdef FEOS
@@ -35,5 +35,45 @@ int zlibng_deflate(
 	*destLen-=z.avail_out;
 
 	return zng_deflateEnd(&z);
+#endif
+}
+
+int zlibng_inflate(
+	unsigned char *dest,
+	size_t *destLen,
+	const unsigned char *source,
+	size_t sourceLen
+){
+#ifdef FEOS
+	return -1;
+#else
+	zng_stream z;
+	int status;
+	z.zalloc = Z_NULL;
+	z.zfree = Z_NULL;
+	z.opaque = Z_NULL;
+
+	if((status=zng_inflateInit2(
+		&z, -MAX_WBITS
+	)) != Z_OK){
+		return status;
+	}
+
+	z.next_in = source;
+	z.avail_in = sourceLen;
+	z.next_out = dest;
+	z.avail_out = *destLen;
+
+	for(;z.avail_out && status != Z_STREAM_END;){
+		status = zng_inflate(&z, Z_BLOCK);
+		if(status==Z_BUF_ERROR)break;
+		if(status != Z_STREAM_END && status != Z_OK){
+			//fprintf(stderr,"inflate: %s\n", (z.msg) ? z.msg : "???");
+			return status;
+		}
+	}
+	*destLen-=z.avail_out;
+
+	return zng_inflateEnd(&z);
 #endif
 }

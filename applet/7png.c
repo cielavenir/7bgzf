@@ -68,7 +68,7 @@ static int _compress(FILE *in, FILE *out, int level, int method, bool strip){
 		if((level||cgbi) && type==fourcc('I','D','A','T')){
 			//recompress
 			if(tbl_last==MAX_IDAT){
-				fprintf(stderr,"Sorry, IDAT is limited to %d.\n",MAX_IDAT);
+				fprintf(stderr,"Sorry, the number of IDAT chunks is limited to %d.\n",MAX_IDAT);
 				return -1;
 			}
 			fprintf(stderr,"IDAT data length=%d\n",len);
@@ -250,6 +250,7 @@ static int _compress(FILE *in, FILE *out, int level, int method, bool strip){
 				}
 			}
 			if(method==DEFLATE_SLZ){
+				slz_initialize();
 				int r=slz_deflate(__compbuf,&compsize,__decompbuf,declen,level);
 				if(r){
 					fprintf(stderr,"slz_deflate %d\n",r);

@@ -1,4 +1,5 @@
 #include "isa-l/include/igzip_lib.h"
+#include <stdlib.h> // malloc/free
 
 int level_size_buf[10] = {
 #ifdef ISAL_DEF_LVL0_DEFAULT
@@ -55,12 +56,12 @@ int level_size_buf[10] = {
 
 int igzip_deflate(
 	unsigned char *dest,
-	unsigned long *destLen,
+	size_t *destLen,
 	const unsigned char *source,
-	unsigned long sourceLen,
+	size_t sourceLen,
 	int level
 ){
-#if defined(FEOS) || defined(NOIGZIP)
+#if defined(NOIGZIP)
 	return -1;
 #else
 	struct isal_zstream z;
@@ -79,7 +80,35 @@ int igzip_deflate(
 
 	int status = isal_deflate_stateless(&z);
 	free(z.level_buf);
-	if(status != ISAL_DECOMP_OK){
+	if(status != COMP_OK){
+		//fprintf(stderr,"deflate: %s\n", (z.msg) ? z.msg : "???");
+		return status;
+	}
+	*destLen-=z.avail_out;
+
+	return 0;
+#endif
+}
+
+int igzip_inflate(
+	unsigned char *dest,
+	size_t *destLen,
+	const unsigned char *source,
+	size_t sourceLen
+){
+#if defined(NOIGZIP)
+	return -1;
+#else
+	struct inflate_state z;
+	isal_inflate_init(&z);
+
+	z.next_in = source;
+	z.avail_in = sourceLen;
+	z.next_out = dest;
+	z.avail_out = *destLen;
+
+	int status = isal_inflate_stateless(&z);
+	if(status != ISAL_DECOMP_OK && status != ISAL_END_INPUT){
 		//fprintf(stderr,"deflate: %s\n", (z.msg) ? z.msg : "???");
 		return status;
 	}

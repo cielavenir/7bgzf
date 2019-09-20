@@ -1,3 +1,9 @@
+// CISO
+// https://github.com/diegocr/CSOMaker/blob/master/ciso.h
+
+// parallel compression is supported.
+// parallel decompression is supported.
+
 #ifdef STANDALONE
 #include "../compat.h"
 #include <stdio.h>
@@ -7,10 +13,6 @@
 #include <sys/stat.h>
 #include "../lib/zlibutil.h"
 unsigned char buf[BUFLEN];
-
-#define DECOMPBUFLEN (1<<16)
-#define COMPBUFLEN   (DECOMPBUFLEN|(DECOMPBUFLEN>>1))
-unsigned char __compbuf[COMPBUFLEN],__decompbuf[DECOMPBUFLEN];
 
 #if 0
 unsigned int read32(const void *p){
@@ -41,6 +43,20 @@ int filelength(int fd){return filelengthi64(fd);}
 #include "../lib/lzma.h"
 #include "../lib/popt/popt.h"
 
+#include <pthread.h>
+
+int copy_block_decode(
+	unsigned char *dest,
+	size_t *destLen,
+	const unsigned char *source,
+	size_t sourceLen
+){
+	if(*destLen < sourceLen)return 1;
+	memcpy(dest,source,sourceLen);
+	*destLen = sourceLen;
+	return 0;
+}
+
 typedef struct ciso_header
 {
     unsigned char magic[4];         /* +00 : 'C','I','S','O'                 */
@@ -52,7 +68,7 @@ typedef struct ciso_header
     unsigned char rsv_06[2];        /* +16 : reserved                        */
 }CISO_H;
 
-static int _compress(FILE *in, FILE *out, int level, int method, int threshold){ //align not supported yet...
+static int _compress(FILE *in, FILE *out, int level, int method, int threshold, int nthreads){ //align not supported yet...
 	CISO_H header;
 	memset(&header,0,sizeof(header));
 	memcpy(header.magic,"CISO",4);
@@ -67,90 +83,100 @@ static int _compress(FILE *in, FILE *out, int level, int method, int threshold){
 	fwrite(&header,1,sizeof(header),out);
 	fwrite(buf,1,4*(total_block+1),out);
 
-	void* coder=NULL;
-	lzmaCreateCoder(&coder,0x040108,1,level);
+	//void* coder=NULL;
+	//lzmaCreateCoder(&coder,0x040108,1,level);
+
+	const int chkpoint_interval=1024;
+	int chkpoint=chkpoint_interval;
+	pthread_t *threads=(pthread_t*)alloca(sizeof(pthread_t)*nthreads);
 	long long i=0;
-	for(;i<total_block;i++){
-		write32(buf+4*i,ftello(out));
-		size_t readlen=fread(__decompbuf,1,header.block_size,in);
-		size_t compsize=COMPBUFLEN;
-
-		if(method==DEFLATE_ZLIB){
-			int r=zlib_deflate(__compbuf,&compsize,__decompbuf,readlen,level);
-			if(r){
-				fprintf(stderr,"deflate %d\n",r);
-				return 1;
+	for(;i<total_block;i+=nthreads){
+		zlibutil_buffer *zlibbuf_main_thread;
+		int j=0;
+		for(;i+j<total_block && j<nthreads;j++){
+			zlibutil_buffer *zlibbuf = zlibutil_buffer_allocate(header.block_size|(header.block_size>>1), header.block_size);
+			zlibbuf->sourceLen=fread(zlibbuf->source,1,header.block_size,in);
+			if(zlibbuf->sourceLen==-1)zlibbuf->sourceLen=0;
+			if(zlibbuf->sourceLen==0){zlibutil_buffer_free(zlibbuf);break;}
+			if(method==DEFLATE_ZLIB){
+				zlibbuf->func = zlib_deflate;
+			}else if(method==DEFLATE_7ZIP){
+				zlibbuf->func = lzma_deflate;
+			}else if(method==DEFLATE_ZOPFLI){
+				zlibbuf->func = zopfli_deflate;
+			}else if(method==DEFLATE_MINIZ){
+				zlibbuf->func = miniz_deflate;
+			}else if(method==DEFLATE_SLZ){
+				slz_initialize();
+				zlibbuf->func = slz_deflate;
+			}else if(method==DEFLATE_LIBDEFLATE){
+				zlibbuf->func = libdeflate_deflate;
+			}else if(method==DEFLATE_ZLIBNG){
+				zlibbuf->func = zlibng_deflate;
+			}else if(method==DEFLATE_IGZIP){
+				zlibbuf->func = igzip_deflate;
+			}
+			zlibbuf->encode = 1;
+			zlibbuf->level = level;
+			if(j<nthreads-1){
+				pthread_create(&threads[j],NULL,zlibutil_buffer_code,zlibbuf);
+			}else{
+				zlibbuf_main_thread=zlibbuf;
+				zlibutil_buffer_code(zlibbuf);
 			}
 		}
-		if(method==DEFLATE_7ZIP){
-			if(coder){
-				int r=lzmaCodeOneshot(coder,__decompbuf,readlen,__compbuf,&compsize);
-				if(r){
-					fprintf(stderr,"NDeflate::CCoder::Code %d\n",r);
-					return 1;
+		if(!j)break;
+		for(int j0=0;j0<j;j0++){
+			zlibutil_buffer *zlibbuf;
+			if(j0<nthreads-1){
+				pthread_join(threads[j0],(void**)&zlibbuf);
+			}else{
+				zlibbuf=zlibbuf_main_thread;
+			}
+			if(zlibbuf->ret){
+				if(method==DEFLATE_ZLIB){
+					fprintf(stderr,"deflate %d\n",zlibbuf->ret);
+				}else if(method==DEFLATE_7ZIP){
+					fprintf(stderr,"NDeflate::CCoder::Code %d\n",zlibbuf->ret);
+				}else if(method==DEFLATE_ZOPFLI){
+					fprintf(stderr,"zopfli_deflate %d\n",zlibbuf->ret);
+				}else if(method==DEFLATE_MINIZ){
+					fprintf(stderr,"miniz_deflate %d\n",zlibbuf->ret);
+				}else if(method==DEFLATE_SLZ){
+					fprintf(stderr,"slz_deflate %d\n",zlibbuf->ret);
+				}else if(method==DEFLATE_LIBDEFLATE){
+					fprintf(stderr,"libdeflate_deflate %d\n",zlibbuf->ret);
+				}else if(method==DEFLATE_ZLIBNG){
+					fprintf(stderr,"zng_deflate %d\n",zlibbuf->ret);
+				}else if(method==DEFLATE_IGZIP){
+					fprintf(stderr,"isal_deflate %d\n",zlibbuf->ret);
 				}
-			}
-		}
-		if(method==DEFLATE_ZOPFLI){
-			int r=zopfli_deflate(__compbuf,&compsize,__decompbuf,readlen,level);
-			if(r){
-				fprintf(stderr,"zopfli_deflate %d\n",r);
+				zlibutil_buffer_free(zlibbuf);
 				return 1;
 			}
-		}
-		if(method==DEFLATE_MINIZ){
-			int r=miniz_deflate(__compbuf,&compsize,__decompbuf,readlen,level);
-			if(r){
-				fprintf(stderr,"miniz_deflate %d\n",r);
-				return 1;
+			write32(buf+4*(i+j0),ftello(out));
+			if(zlibbuf->destLen>header.block_size*threshold/100){ //store
+				fwrite(zlibbuf->source,1,zlibbuf->sourceLen,out);
+				write32(buf+4*(i+j0),0x80000000|read32(buf+4*(i+j0)));
+			}else{
+				fwrite(zlibbuf->dest,1,zlibbuf->destLen,out);
 			}
+			zlibutil_buffer_free(zlibbuf);
 		}
-		if(method==DEFLATE_SLZ){
-			int r=slz_deflate(__compbuf,&compsize,__decompbuf,readlen,level);
-			if(r){
-				fprintf(stderr,"slz_deflate %d\n",r);
-				return 1;
-			}
+		while((i+nthreads)>=chkpoint){
+			fprintf(stderr,"%"LLD" / %"LLD"\r",i+nthreads,total_block);
+			chkpoint+=chkpoint_interval;
 		}
-		if(method==DEFLATE_LIBDEFLATE){
-			int r=libdeflate_deflate(__compbuf,&compsize,__decompbuf,readlen,level);
-			if(r){
-				fprintf(stderr,"libdeflate_deflate %d\n",r);
-				return 1;
-			}
-		}
-		if(method==DEFLATE_ZLIBNG){
-			int r=zlibng_deflate(__compbuf,&compsize,__decompbuf,readlen,level);
-			if(r){
-				fprintf(stderr,"zng_deflate %d\n",r);
-				return 1;
-			}
-		}
-		if(method==DEFLATE_IGZIP){
-			int r=igzip_deflate(__compbuf,&compsize,__decompbuf,readlen,level);
-			if(r){
-				fprintf(stderr,"isal_deflate %d\n",r);
-				return 1;
-			}
-		}
-
-		if(compsize>header.block_size*threshold/100){ //store
-			fwrite(__decompbuf,1,readlen,out);
-			write32(buf+4*i,0x80000000|read32(buf+4*i));
-		}else{
-			fwrite(__compbuf,1,compsize,out);
-		}
-		if((i+1)%256==0)fprintf(stderr,"%"LLD" / %"LLD"\r",i+1,total_block);
 	}
 	write32(buf+4*i,ftello(out));
 	fseeko(out,sizeof(header),SEEK_SET);
 	fwrite(buf,1,4*(total_block+1),out);
 	fprintf(stderr,"%"LLD" / %"LLD" done.\n",i,total_block);
-	lzmaDestroyCoder(&coder);
+	//lzmaDestroyCoder(&coder);
 	return 0;
 }
 
-static int _decompress(FILE *in, FILE *out){
+static int _decompress(FILE *in, FILE *out, int nthreads){
 	CISO_H header;
 	fread(&header,1,sizeof(header),in);
 	if(memcmp(header.magic,"CISO",4)||(header.header_size&&header.header_size!=sizeof(header))){fprintf(stderr,"not CISO\n");return 1;}
@@ -159,35 +185,64 @@ static int _decompress(FILE *in, FILE *out){
 	int i=0;
 	int counter=sizeof(header)+4*(total_block+1);
 
-	//void* coder=NULL;
-	//lzmaCreateCoder(&coder,0x040108,0,0);
-	for(;i<total_block;i++){
-		u32 index=read32(buf+4*i);
-		u32 plain=index&0x80000000;
-		index&=0x7fffffff;
-		u32 pos=index<<header.align;
-		if(pos>counter)fread(buf+BUFLEN-(pos-counter),1,pos-counter,in); //discard
+	const int chkpoint_interval=4096;
+	int chkpoint=chkpoint_interval;
+	pthread_t *threads=(pthread_t*)alloca(sizeof(pthread_t)*nthreads);
+	for(;i<total_block;i+=nthreads){
+		zlibutil_buffer *zlibbuf_main_thread;
+		int j=0;
+		for(;i+j<total_block && j<nthreads;j++){
+			u32 index=read32(buf+4*(i+j));
+			u32 plain=index&0x80000000;
+			index&=0x7fffffff;
+			u32 pos=index<<header.align;
+			if(pos>counter)fread(buf+BUFLEN-(pos-counter),1,pos-counter,in); //discard
 
-		u32 size=((read32(buf+4*(i+1))&0x7fffffff)<<header.align) - index;
-		if(plain){
-			fread(__decompbuf,1,size,in);counter+=size;
-			fwrite(__decompbuf,1,size,out);
-		}else{
-			fread(__compbuf,1,size,in);counter+=size;
-			size_t decompsize=header.block_size;
-
-			int r=zlib_inflate(__decompbuf,&decompsize,__compbuf,size);
-			if(r){
-				fprintf(stderr,"inflate %d\n",r);
+			u32 size=((read32(buf+4*(i+j+1))&0x7fffffff)<<header.align) - index;
+			if(plain){
+				zlibutil_buffer *zlibbuf = zlibutil_buffer_allocate(size, size);
+				fread(zlibbuf->source,1,size,in);counter+=size;
+				zlibbuf->func = copy_block_decode;
+				if(j<nthreads-1){
+					pthread_create(&threads[j],NULL,zlibutil_buffer_code,zlibbuf);
+				}else{
+					zlibbuf_main_thread=zlibbuf;
+					zlibutil_buffer_code(zlibbuf);
+				}
+			}else{
+				zlibutil_buffer *zlibbuf = zlibutil_buffer_allocate(header.block_size, size);
+				fread(zlibbuf->source,1,size,in);counter+=size;
+				zlibbuf->func = zlibutil_auto_inflate;
+				if(j<nthreads-1){
+					pthread_create(&threads[j],NULL,zlibutil_buffer_code,zlibbuf);
+				}else{
+					zlibbuf_main_thread=zlibbuf;
+					zlibutil_buffer_code(zlibbuf);
+				}
+			}
+		}
+		if(!j)break;
+		for(int j0=0;j0<j;j0++){
+			zlibutil_buffer *zlibbuf;
+			if(j0<nthreads-1){
+				pthread_join(threads[j0],(void**)&zlibbuf);
+			}else{
+				zlibbuf=zlibbuf_main_thread;
+			}
+			if(zlibbuf->ret){
+				fprintf(stderr,"%d inflate %d\n",j0,zlibbuf->ret);
+				zlibutil_buffer_free(zlibbuf);
 				return 1;
 			}
-
-			fwrite(__decompbuf,1,decompsize,out);
+			fwrite(zlibbuf->dest,1,zlibbuf->destLen,out);
+			zlibutil_buffer_free(zlibbuf);
 		}
-		if((i+1)%256==0)fprintf(stderr,"%d / %d\r",i+1,total_block);
+		while((i+nthreads)>=chkpoint){
+			fprintf(stderr,"%d / %d\r",i+nthreads,total_block);
+			chkpoint+=chkpoint_interval;
+		}
 	}
 	fprintf(stderr,"%d / %d done.\n",i,total_block);
-	//lzmaDestroyCoder(&coder);
 	return 0;
 }
 
@@ -199,7 +254,7 @@ int _7ciso(const int argc, const char **argv){
 #endif
 	int cmode=0,mode=0;
 	int zlib=0,sevenzip=0,zopfli=0,miniz=0,slz=0,libdeflate=0,zlibng=0,igzip=0;
-	int threshold=100;
+	int threshold=100,nthreads=1;
 	poptContext optCon;
 	int optc;
 
@@ -215,6 +270,7 @@ int _7ciso(const int argc, const char **argv){
 		{ "igzip",     'i',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,    'i',       "1-4 (default 1) igzip (1 becomes igzip internal level 0, 2 becomes 1, ...)", "level" },
 		{ "zopfli",     'Z',         POPT_ARG_INT, &zopfli,    0,       "zopfli", "numiterations" },
 		{ "threshold",  't',         POPT_ARG_INT, &threshold, 0,       "compression threshold (in %, 10-100)", "threshold" },
+		{ "threads",     '@',         POPT_ARG_INT, &nthreads,    0,       "threads", "threads" },
 		{ "decompress", 'd',         POPT_ARG_NONE,            &mode,      0,       "decompress", NULL },
 		POPT_AUTOHELP,
 		POPT_TABLEEND,
@@ -282,13 +338,14 @@ int _7ciso(const int argc, const char **argv){
 		else fprintf(stderr,"\nNote: 7-zip is NOT available.\n");
 		return 1;
 	}
+	if(nthreads<1)nthreads=1;
 
 	if(mode){
 		if(isatty(fileno(stdin))||isatty(fileno(stdout)))
 			{poptPrintHelp(optCon, stderr, 0);poptFreeContext(optCon);return -1;}
 		poptFreeContext(optCon);
 		//lzmaOpen7z();
-		int ret=_decompress(stdin,stdout);
+		int ret=_decompress(stdin,stdout,nthreads);
 		//lzmaClose7z();
 		return ret;
 	}else{
@@ -309,33 +366,33 @@ int _7ciso(const int argc, const char **argv){
 		int ret=0;
 		if(zlib){
 			fprintf(stderr,"(zlib)\n");
-			ret=_compress(in,out,zlib,DEFLATE_ZLIB,threshold);
+			ret=_compress(in,out,zlib,DEFLATE_ZLIB,threshold,nthreads);
 		}else if(sevenzip){
 			fprintf(stderr,"(7zip)\n");
 			if(lzmaOpen7z()){
 				fprintf(stderr,"7-zip is NOT available.\n");
 				return -1;
 			}
-			ret=_compress(in,out,sevenzip,DEFLATE_7ZIP,threshold);
+			ret=_compress(in,out,sevenzip,DEFLATE_7ZIP,threshold,nthreads);
 			lzmaClose7z();
 		}else if(zopfli){
 			fprintf(stderr,"(zopfli)\n");
-			ret=_compress(in,out,zopfli,DEFLATE_ZOPFLI,threshold);
+			ret=_compress(in,out,zopfli,DEFLATE_ZOPFLI,threshold,nthreads);
 		}else if(miniz){
 			fprintf(stderr,"(miniz)\n");
-			ret=_compress(in,out,miniz,DEFLATE_MINIZ,threshold);
+			ret=_compress(in,out,miniz,DEFLATE_MINIZ,threshold,nthreads);
 		}else if(slz){
 			fprintf(stderr,"(slz)\n");
-			ret=_compress(in,out,slz,DEFLATE_SLZ,threshold);
+			ret=_compress(in,out,slz,DEFLATE_SLZ,threshold,nthreads);
 		}else if(libdeflate){
 			fprintf(stderr,"(libdeflate)\n");
-			ret=_compress(in,out,libdeflate,DEFLATE_LIBDEFLATE,threshold);
+			ret=_compress(in,out,libdeflate,DEFLATE_LIBDEFLATE,threshold,nthreads);
 		}else if(zlibng){
 			fprintf(stderr,"(zlibng)\n");
-			ret=_compress(in,out,zlibng,DEFLATE_ZLIBNG,threshold);
+			ret=_compress(in,out,zlibng,DEFLATE_ZLIBNG,threshold,nthreads);
 		}else if(igzip){
 			fprintf(stderr,"(igzip)\n");
-			ret=_compress(in,out,igzip,DEFLATE_IGZIP,threshold);
+			ret=_compress(in,out,igzip,DEFLATE_IGZIP,threshold,nthreads);
 		}
 		fclose(in),fclose(out);
 		return ret;
