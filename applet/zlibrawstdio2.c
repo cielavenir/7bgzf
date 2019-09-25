@@ -20,8 +20,8 @@ extern unsigned char __compbuf[COMPBUFLEN],__decompbuf[DECOMPBUFLEN];
 
 static int fread2(void *h, char *p, int n){return fread(p,1,n,(FILE*)h);}
 static int fwrite2(void *h, const char *p, int n){return fwrite(p,1,n,(FILE*)h);}
-static int _compress(FILE *fin,FILE *fout,int level){
-	if(!lzmaOpen7z()){
+static int _compress(FILE *fin,FILE *fout,int level,int sevenzip){
+	if(sevenzip && !lzmaOpen7z()){
 		void *coder=NULL;
 		lzmaCreateCoder(&coder,0x040108,1,level);
 		if(coder){
@@ -148,19 +148,19 @@ int main(const int argc, const char **argv){
 #else
 int zlibrawstdio2(const int argc, const char **argv){
 #endif
-	char mode='c',level='9';
+	char mode='c',level=0;
 	if(argc>=2){
 		mode=argv[1][0],level=argv[1][1];
 		if(!mode)goto argerror;
 		if(mode=='-')mode=argv[1][1],level=argv[1][2];
-		if(mode!='e'&&mode!='c'&&mode!='d')goto argerror;
+		if(mode!='e'&&mode!='c'&&mode!='s'&&mode!='d')goto argerror;
 	}
 	if(isatty(fileno(stdin))&&isatty(fileno(stdout)))goto argerror;
 
-	return mode=='d'?_decompress(stdin,stdout):_compress(stdin,stdout,level?level-'0':9);
+	return mode=='d'?_decompress(stdin,stdout):_compress(stdin,stdout,level?level-'0':9,mode=='s');
 
 argerror:
-	fprintf(stderr,"zlibrawstdio2 [e[9]]/d < in > out\nYou can also use -e,-c,-d.\n");
+	fprintf(stderr,"zlibrawstdio2 [e[9]]/d < in > out\nYou can also use -e,-c,-s,-d (-s is 7-zip mode).\n");
 	if(!lzmaOpen7z())fprintf(stderr,"\nNote: 7-zip is AVAILABLE.\n"),lzmaClose7z();
 	else fprintf(stderr,"\nNote: 7-zip is NOT available.\n");
 	return -1;

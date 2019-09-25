@@ -308,14 +308,16 @@ int _7daxcr(const int argc, const char **argv){
 	}
 	if(nthreads<1)nthreads=1;
 
+	struct timeval tstart,tend;
+	gettimeofday(&tstart,NULL);
+	int ret=0;
 	if(mode){
 		if(isatty(fileno(stdin))||isatty(fileno(stdout)))
 			{poptPrintHelp(optCon, stderr, 0);poptFreeContext(optCon);return -1;}
 		poptFreeContext(optCon);
 		//lzmaOpen7z();
-		int ret=_decompress(stdin,stdout,nthreads);
+		ret=_decompress(stdin,stdout,nthreads);
 		//lzmaClose7z();
-		return ret;
 	}else{
 		if(threshold<10)threshold=10;
 		if(threshold>100)threshold=100;
@@ -331,7 +333,6 @@ int _7daxcr(const int argc, const char **argv){
 		poptFreeContext(optCon);
 
 		fprintf(stderr,"compression level = %d ",level_sum);
-		int ret=0;
 		if(zlib){
 			fprintf(stderr,"(zlib)\n");
 			ret=_compress(in,out,zlib,DEFLATE_ZLIB,nthreads);
@@ -363,6 +364,8 @@ int _7daxcr(const int argc, const char **argv){
 			ret=_compress(in,out,igzip,DEFLATE_IGZIP,nthreads);
 		}
 		fclose(in),fclose(out);
-		return ret;
 	}
+	gettimeofday(&tend,NULL);
+	fprintf(stderr,"ellapsed time: %.6f sec\n",(tend.tv_sec+tend.tv_usec*0.000001)-(tstart.tv_sec+tstart.tv_usec*0.000001));
+	return ret;
 }

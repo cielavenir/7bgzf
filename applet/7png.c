@@ -439,6 +439,8 @@ int _7png(const int argc, const char **argv){
 	poptFreeContext(optCon);
 
 	fprintf(stderr,"compression level = %d ",level_sum);
+	struct timeval tstart,tend;
+	gettimeofday(&tstart,NULL);
 	int ret=0;
 	if(zlib){
 		fprintf(stderr,"(zlib)\n");
@@ -473,5 +475,7 @@ int _7png(const int argc, const char **argv){
 		fprintf(stderr,"(strip)\n");
 		ret=_compress(stdin,stdout,0,0,mode);
 	}
+	gettimeofday(&tend,NULL);
+	fprintf(stderr,"ellapsed time: %.6f sec\n",(tend.tv_sec+tend.tv_usec*0.000001)-(tstart.tv_sec+tstart.tv_usec*0.000001));
 	return ret;
 }

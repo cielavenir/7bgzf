@@ -470,6 +470,9 @@ int _7razf(const int argc, const char **argv){
 	}
 	if(nthreads<1)nthreads=1;
 
+	struct timeval tstart,tend;
+	gettimeofday(&tstart,NULL);
+	int ret=0;
 	if(mode){
 		//if(isatty(fileno(stdin))||isatty(fileno(stdout)))
 		//	{poptPrintHelp(optCon, stderr, 0);poptFreeContext(optCon);return -1;}
@@ -481,10 +484,9 @@ int _7razf(const int argc, const char **argv){
 		poptFreeContext(optCon);
 
 		//lzmaOpen7z();
-		int ret=_decompress(in,stdout,nthreads);
+		ret=_decompress(in,stdout,nthreads);
 		//lzmaClose7z();
 		fclose(in);
-		return ret;
 	}else{
 		const char *fname=poptGetArg(optCon);
 		if(!fname){poptPrintHelp(optCon, stderr, 0);poptFreeContext(optCon);return -1;}
@@ -493,7 +495,6 @@ int _7razf(const int argc, const char **argv){
 		poptFreeContext(optCon);
 
 		fprintf(stderr,"compression level = %d ",level_sum);
-		int ret=0;
 		if(zlib){
 			fprintf(stderr,"(zlib)\n");
 			ret=_compress(in,stdout,zlib,DEFLATE_ZLIB,nthreads);
@@ -525,6 +526,8 @@ int _7razf(const int argc, const char **argv){
 			ret=_compress(in,stdout,igzip,DEFLATE_IGZIP,nthreads);
 		}
 		fclose(in);
-		return ret;
 	}
+	gettimeofday(&tend,NULL);
+	fprintf(stderr,"ellapsed time: %.6f sec\n",(tend.tv_sec+tend.tv_usec*0.000001)-(tstart.tv_sec+tstart.tv_usec*0.000001));
+	return ret;
 }

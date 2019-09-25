@@ -285,7 +285,7 @@ int _7migz(const int argc, const char **argv){
 		POPT_TABLEEND,
 	};
 	optCon = poptGetContext(argv[0], argc, argv, optionsTable, 0);
-	poptSetOtherOptionHelp(optCon, "-cz9 < dec.bin > enc.bgz or -cd < enc.bgz > dec.bin");
+	poptSetOtherOptionHelp(optCon, "-cz9 < dec.bin > enc.mgz or -cd < enc.mgz > dec.bin");
 
 	for(;(optc=poptGetNextOpt(optCon))>=0;){
 		switch(optc){
@@ -349,21 +349,22 @@ int _7migz(const int argc, const char **argv){
 	}
 	if(nthreads<1)nthreads=1;
 
+	struct timeval tstart,tend;
+	gettimeofday(&tstart,NULL);
+	int ret=0;
 	if(mode){
 		if(isatty(fileno(stdin))||isatty(fileno(stdout)))
 			{poptPrintHelp(optCon, stderr, 0);poptFreeContext(optCon);return -1;}
 		poptFreeContext(optCon);
 		//lzmaOpen7z();
-		int ret=_decompress(stdin,stdout,nthreads);
+		ret=_decompress(stdin,stdout,nthreads);
 		//lzmaClose7z();
-		return ret;
 	}else{
 		if(isatty(fileno(stdin))||isatty(fileno(stdout)))
 			{poptPrintHelp(optCon, stderr, 0);poptFreeContext(optCon);return -1;}
 		poptFreeContext(optCon);
 
 		fprintf(stderr,"compression level = %d ",level_sum);
-		int ret=0;
 		if(zlib){
 			fprintf(stderr,"(zlib)\n");
 			ret=_compress(stdin,stdout,zlib,DEFLATE_ZLIB,nthreads);
@@ -394,6 +395,8 @@ int _7migz(const int argc, const char **argv){
 			fprintf(stderr,"(igzip)\n");
 			ret=_compress(stdin,stdout,igzip,DEFLATE_IGZIP,nthreads);
 		}
-		return ret;
 	}
+	gettimeofday(&tend,NULL);
+	fprintf(stderr,"ellapsed time: %.6f sec\n",(tend.tv_sec+tend.tv_usec*0.000001)-(tstart.tv_sec+tstart.tv_usec*0.000001));
+	return ret;
 }
