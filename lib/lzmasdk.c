@@ -7,6 +7,7 @@
 
 #include "lzma.h"
 #include <string.h>
+#include <wchar.h>
 
 unsigned int read32(const void *p){
 	const unsigned char *x=(const unsigned char*)p;
@@ -864,7 +865,7 @@ int lzmaCreateArchiver(void **archiver,unsigned char arctype,int encode,int leve
 		// there are massive options in 7-zip; just support -mx=N for now.
 		ISetProperties_ *setprop;
 		(*(IOutArchive_**)archiver)->vt->QueryInterface(*archiver, &IID_ISetProperties_, (void**)&setprop);
-		wchar_t* OPTS[]={L"x"};
+		const wchar_t* OPTS[]={L"x"};
 		PROPVARIANT VAR[]={{VT_UI4,0,0,0,{0}}};
 		VAR[0].uintVal=level;
 		setprop->vt->SetProperties(setprop,OPTS,VAR,1);
