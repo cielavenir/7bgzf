@@ -46,6 +46,7 @@ void write16(void *p, const unsigned short n){
 #include "../lib/lzma.h"
 #include "../lib/popt/popt.h"
 
+#include <sys/time.h>
 #include <pthread.h>
 
 // gzip flag byte
@@ -154,7 +155,7 @@ if(fBGZF_BUFSHORTAGE_FALLBACK){
 			zlibbuf->encode = 1;
 			zlibbuf->level = level;
 			if(j<nthreads-1){
-				pthread_create(&threads[j],NULL,zlibutil_buffer_code,zlibbuf);
+				pthread_create(&threads[j],NULL,(void*(*)(void*))zlibutil_buffer_code,zlibbuf);
 			}else{
 				zlibbuf_main_thread=zlibbuf;
 				zlibutil_buffer_code(zlibbuf);
@@ -238,11 +239,11 @@ static int _decompress(FILE *in, FILE *out, int nthreads){
 	int chkpoint=chkpoint_interval;
 	pthread_t *threads=(pthread_t*)alloca(sizeof(pthread_t)*nthreads);
 	for(;;i+=nthreads){
-		zlibutil_buffer *zlibbuf_main_thread;
+		zlibutil_buffer *zlibbuf_main_thread=NULL;
 		int j=0;
 		for(;j<nthreads;j++){
 			if((readlen=fread(buf,1,header_buffer_interval,in))<=0)break;
-			int extra_off, extra_len, block_len;
+			int extra_off, extra_len, block_len=0;
 			int n=_read_gz_header(buf,readlen,&extra_off,&extra_len,&block_len);
 			if(!n){
 				fprintf(stderr,"not BGZF or corrupted\n");
@@ -264,7 +265,7 @@ static int _decompress(FILE *in, FILE *out, int nthreads){
 			memcpy(zlibbuf->source,buf,zlibbuf->sourceLen);
 			zlibbuf->func = zlibutil_auto_inflate;
 			if(j<nthreads-1){
-				pthread_create(&threads[j],NULL,zlibutil_buffer_code,zlibbuf);
+				pthread_create(&threads[j],NULL,(void*(*)(void*))zlibutil_buffer_code,zlibbuf);
 			}else{
 				zlibbuf_main_thread=zlibbuf;
 				zlibutil_buffer_code(zlibbuf);

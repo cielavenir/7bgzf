@@ -39,6 +39,8 @@ void write32(void *p, const unsigned int n){
 #include "../lib/lzma.h"
 #include "../lib/popt/popt.h"
 
+#include <sys/time.h>
+
 #define MAX_IDAT 1024
 static unsigned char* tbl[MAX_IDAT];
 static unsigned int tbl_size[MAX_IDAT];

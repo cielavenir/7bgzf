@@ -43,6 +43,7 @@ int filelength(int fd){return filelengthi64(fd);}
 #include "../lib/lzma.h"
 #include "../lib/popt/popt.h"
 
+#include <sys/time.h>
 #include <pthread.h>
 
 int copy_block_decode(
@@ -91,7 +92,7 @@ static int _compress(FILE *in, FILE *out, int level, int method, int threshold, 
 	pthread_t *threads=(pthread_t*)alloca(sizeof(pthread_t)*nthreads);
 	long long i=0;
 	for(;i<total_block;i+=nthreads){
-		zlibutil_buffer *zlibbuf_main_thread;
+		zlibutil_buffer *zlibbuf_main_thread=NULL;
 		int j=0;
 		for(;i+j<total_block && j<nthreads;j++){
 			zlibutil_buffer *zlibbuf = zlibutil_buffer_allocate(header.block_size+(header.block_size>>1), header.block_size);
@@ -119,7 +120,7 @@ static int _compress(FILE *in, FILE *out, int level, int method, int threshold, 
 			zlibbuf->encode = 1;
 			zlibbuf->level = level;
 			if(j<nthreads-1){
-				pthread_create(&threads[j],NULL,zlibutil_buffer_code,zlibbuf);
+				pthread_create(&threads[j],NULL,(void*(*)(void*))zlibutil_buffer_code,zlibbuf);
 			}else{
 				zlibbuf_main_thread=zlibbuf;
 				zlibutil_buffer_code(zlibbuf);
@@ -189,7 +190,7 @@ static int _decompress(FILE *in, FILE *out, int nthreads){
 	int chkpoint=chkpoint_interval;
 	pthread_t *threads=(pthread_t*)alloca(sizeof(pthread_t)*nthreads);
 	for(;i<total_block;i+=nthreads){
-		zlibutil_buffer *zlibbuf_main_thread;
+		zlibutil_buffer *zlibbuf_main_thread=NULL;
 		int j=0;
 		for(;i+j<total_block && j<nthreads;j++){
 			u32 index=read32(buf+4*(i+j));
@@ -204,7 +205,7 @@ static int _decompress(FILE *in, FILE *out, int nthreads){
 				fread(zlibbuf->source,1,size,in);counter+=size;
 				zlibbuf->func = copy_block_decode;
 				if(j<nthreads-1){
-					pthread_create(&threads[j],NULL,zlibutil_buffer_code,zlibbuf);
+					pthread_create(&threads[j],NULL,(void*(*)(void*))zlibutil_buffer_code,zlibbuf);
 				}else{
 					zlibbuf_main_thread=zlibbuf;
 					zlibutil_buffer_code(zlibbuf);
@@ -214,7 +215,7 @@ static int _decompress(FILE *in, FILE *out, int nthreads){
 				fread(zlibbuf->source,1,size,in);counter+=size;
 				zlibbuf->func = zlibutil_auto_inflate;
 				if(j<nthreads-1){
-					pthread_create(&threads[j],NULL,zlibutil_buffer_code,zlibbuf);
+					pthread_create(&threads[j],NULL,(void*(*)(void*))zlibutil_buffer_code,zlibbuf);
 				}else{
 					zlibbuf_main_thread=zlibbuf;
 					zlibutil_buffer_code(zlibbuf);

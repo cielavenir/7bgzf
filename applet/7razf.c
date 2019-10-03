@@ -102,7 +102,10 @@ int filelength(int fd){return filelengthi64(fd);}
 //#include "../lib/zlib/inftrees.h"
 //#include "../lib/zlib/inflate.h"
 
+#include <sys/time.h>
 #include <pthread.h>
+
+int inflate_testdecode(z_streamp strm, int flush);
 
 zlibutil_buffer *zlibutil_buffer_full_flush(zlibutil_buffer *zlibbuf){
 	zlibutil_buffer_code(zlibbuf);
@@ -201,7 +204,7 @@ static int _compress(FILE *in, FILE *out, int level, int method, int nthreads){
 	pthread_t *threads=(pthread_t*)alloca(sizeof(pthread_t)*nthreads);
 	long long i=-1;
 	for(;i<total_block;i+=nthreads){
-		zlibutil_buffer *zlibbuf_main_thread;
+		zlibutil_buffer *zlibbuf_main_thread=NULL;
 		int j=0;
 		for(;i+j<total_block && j<nthreads;j++){
 			zlibutil_buffer *zlibbuf = zlibutil_buffer_allocate(block_size+(block_size>>1), block_size);
@@ -231,9 +234,9 @@ static int _compress(FILE *in, FILE *out, int level, int method, int nthreads){
 			zlibbuf->level = level;
 			if(j<nthreads-1){
 				if(i+j<total_block-1){
-					pthread_create(&threads[j],NULL,zlibutil_buffer_full_flush,zlibbuf);
+					pthread_create(&threads[j],NULL,(void*(*)(void*))zlibutil_buffer_full_flush,zlibbuf);
 				}else{
-					pthread_create(&threads[j],NULL,zlibutil_buffer_code,zlibbuf);
+					pthread_create(&threads[j],NULL,(void*(*)(void*))zlibutil_buffer_code,zlibbuf);
 				}
 			}else{
 				zlibbuf_main_thread=zlibbuf;
@@ -280,7 +283,7 @@ static int _compress(FILE *in, FILE *out, int level, int method, int nthreads){
 			zlibutil_buffer_free(zlibbuf);
 		}
 		while((i+nthreads)>=chkpoint){
-			fprintf(stderr,"%d / %d\r",i+nthreads,total_block);
+			fprintf(stderr,"%"LLD" / %"LLD"\r",i+nthreads,total_block);
 			chkpoint+=chkpoint_interval;
 		}
 	}
@@ -324,7 +327,7 @@ static int _decompress(FILE *in, FILE *out, int nthreads){
 	int chkpoint=chkpoint_interval;
 	pthread_t *threads=(pthread_t*)alloca(sizeof(pthread_t)*nthreads);
 	for(;i<total_block;i+=nthreads){
-		zlibutil_buffer *zlibbuf_main_thread;
+		zlibutil_buffer *zlibbuf_main_thread=NULL;
 		int j=0;
 		for(;i+j<total_block && j<nthreads;j++){
 			u32 index=i+j<0 ? offset+len : read32be(buf+8*(bins+1)+4*(i+j))+read64be(buf+((i+j)/binsize)*8);
@@ -344,7 +347,7 @@ static int _decompress(FILE *in, FILE *out, int nthreads){
 				zlibbuf->func = igzip_inflate;
 #endif
 				if(j<nthreads-1){
-					pthread_create(&threads[j],NULL,zlibutil_buffer_code,zlibbuf);
+					pthread_create(&threads[j],NULL,(void*(*)(void*))zlibutil_buffer_code,zlibbuf);
 				}else{
 					zlibbuf_main_thread=zlibbuf;
 					zlibutil_buffer_code(zlibbuf);

@@ -52,6 +52,7 @@ void *_memmem(const void *s1, size_t siz1, const void *s2, size_t siz2);
 #include "../lib/lzma.h"
 #include "../lib/popt/popt.h"
 
+#include <sys/time.h>
 #include <pthread.h>
 
 #define GZINGA_HEADER "\x1f\x8b\x08\x10\x00\x00\x00\x00\x00"
@@ -99,7 +100,7 @@ static int _compress(FILE *in, FILE *out, int level, int method, int nthreads){
 	long long total_size=0;
 	int total_block=0;
 	for(;/*i<total_block*/;i+=nthreads){
-		zlibutil_buffer *zlibbuf_main_thread;
+		zlibutil_buffer *zlibbuf_main_thread=NULL;
 		int j=0;
 		for(;j<nthreads;j++){
 			zlibutil_buffer *zlibbuf = zlibutil_buffer_allocate(block_size+(block_size>>1), block_size);
@@ -127,7 +128,7 @@ static int _compress(FILE *in, FILE *out, int level, int method, int nthreads){
 			zlibbuf->encode = 1;
 			zlibbuf->level = level;
 			if(j<nthreads-1){
-				pthread_create(&threads[j],NULL,zlibutil_buffer_code,zlibbuf);
+				pthread_create(&threads[j],NULL,(void*(*)(void*))zlibutil_buffer_code,zlibbuf);
 			}else{
 				zlibbuf_main_thread=zlibbuf;
 				zlibutil_buffer_code(zlibbuf);
@@ -180,7 +181,7 @@ static int _compress(FILE *in, FILE *out, int level, int method, int nthreads){
 	}
 	fwrite("\x1f\x8b\x08\x10\x00\x00\x00\x00\x00\xff",1,10,out);
 	for(int iblk=0;iblk<total_block;iblk++){
-		fprintf(out,"%d:%lld;",iblk,read64(buf+16+8*iblk));
+		fprintf(out,"%d:%"LLD";",iblk,read64(buf+16+8*iblk));
 	}
 	fwrite("\x00\x03\x00\x00\x00\x00\x00\x00\x00\x00\x00",1,11,out);
 	fprintf(stderr,"%d done.\n",i);
@@ -191,7 +192,7 @@ static int _compress(FILE *in, FILE *out, int level, int method, int nthreads){
 static int _decompress(FILE *in, FILE *out, int nthreads){
 	int readlen,i=0;
 	long long filepos=0,rawpos=0;
-	int header_buffer_interval = 32;
+	//int header_buffer_interval = 32;
 
 	const int chkpoint_interval=256;
 	int chkpoint=chkpoint_interval;
@@ -220,7 +221,7 @@ static int _decompress(FILE *in, FILE *out, int nthreads){
 	int LSTOFFSET=BUFLEN*3/4;
 	head+=10;
 	fprintf(stderr,"%s\n",head);
-	long long *lstbegin=buf+LSTOFFSET;
+	long long *lstbegin=(long long*)(buf+LSTOFFSET);
 	int total_block=0;
 	lstbegin[total_block]=0;
 	total_block++;
@@ -236,12 +237,12 @@ static int _decompress(FILE *in, FILE *out, int nthreads){
 
 	total_block--;
 	for(;i<total_block;i+=nthreads){
-		zlibutil_buffer *zlibbuf_main_thread;
+		zlibutil_buffer *zlibbuf_main_thread=NULL;
 		int j=0;
 		for(;i+j<total_block && j<nthreads;j++){
 			long long lentoread=lstbegin[i+j+1]-lstbegin[i+j];
 			if(lentoread>LSTOFFSET){
-				fprintf(stderr,"compressed block does not fit in shared buffer (%d)\n",lentoread);
+				fprintf(stderr,"compressed block does not fit in shared buffer (%"LLD")\n",lentoread);
 				return -1;
 			}
 			//due to original GZinga bug, header size is increasing among blocks. whole block should be read.
@@ -261,7 +262,7 @@ static int _decompress(FILE *in, FILE *out, int nthreads){
 			memcpy(zlibbuf->source,buf+n,zlibbuf->sourceLen);
 			zlibbuf->func = zlibutil_auto_inflate;
 			if(j<nthreads-1){
-				pthread_create(&threads[j],NULL,zlibutil_buffer_code,zlibbuf);
+				pthread_create(&threads[j],NULL,(void*(*)(void*))zlibutil_buffer_code,zlibbuf);
 			}else{
 				zlibbuf_main_thread=zlibbuf;
 				zlibutil_buffer_code(zlibbuf);
