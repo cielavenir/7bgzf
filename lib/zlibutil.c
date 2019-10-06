@@ -184,7 +184,7 @@ int zlib_deflate(
 		return status;
 	}
 
-	z.next_in = source;
+	z.next_in = (unsigned char*)source;
 	z.avail_in = sourceLen;
 	z.next_out = dest;
 	z.avail_out = *destLen;
@@ -217,7 +217,7 @@ int zlib_inflate(
 		return status;
 	}
 
-	z.next_in = source;
+	z.next_in = (unsigned char*)source;
 	z.avail_in = sourceLen;
 	z.next_out = dest;
 	z.avail_out = *destLen;
@@ -237,11 +237,20 @@ int zlib_inflate(
 
 zlibutil_buffer *zlibutil_buffer_allocate(size_t destSiz, size_t sourceSiz){
 	zlibutil_buffer *zlibbuf=(zlibutil_buffer*)calloc(1,sizeof(zlibutil_buffer));
-	if(!zlibbuf)return zlibbuf;
-	zlibbuf->dest = (unsigned char*)malloc(destSiz);
+	if(!zlibbuf)return NULL;
 	zlibbuf->destLen = destSiz;
-	zlibbuf->source = (unsigned char*)malloc(sourceSiz);
+	zlibbuf->dest = (unsigned char*)malloc(destSiz);
+	if(!zlibbuf->dest){
+		free(zlibbuf);
+		return NULL;
+	}
 	zlibbuf->sourceLen = sourceSiz;
+	zlibbuf->source = (unsigned char*)malloc(sourceSiz);
+	if(!zlibbuf->source){
+		free(zlibbuf->dest);
+		free(zlibbuf);
+		return NULL;
+	}
 	return zlibbuf;
 }
 zlibutil_buffer *zlibutil_buffer_code(zlibutil_buffer *zlibbuf){
@@ -256,7 +265,7 @@ zlibutil_buffer *zlibutil_buffer_code(zlibutil_buffer *zlibbuf){
 		if(zlibbuf->rfc1950){
 			zlibbuf->dest-=2;
 			if(!zlibbuf->ret){
-				write32be(zlibbuf->dest+zlibbuf->destLen,adler32(1,zlibbuf->source,zlibbuf->sourceLen));
+				write32be(zlibbuf->dest+2+zlibbuf->destLen,adler32(1,zlibbuf->source,zlibbuf->sourceLen));
 				zlibbuf->dest[0]=0x78;
 				zlibbuf->dest[1]=0xda;
 				zlibbuf->destLen+=6;
