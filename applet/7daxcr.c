@@ -15,6 +15,8 @@ unsigned char buf[BUFLEN];
 #define COMPBUFLEN   (DECOMPBUFLEN|(DECOMPBUFLEN>>1))
 unsigned char __compbuf[COMPBUFLEN],__decompbuf[DECOMPBUFLEN];
 
+unsigned int read32(const void *p);
+void write32(void *p, const unsigned int n);
 #if 0
 unsigned int read32(const void *p){
 	const unsigned char *x=(const unsigned char*)p;
@@ -25,11 +27,6 @@ void write32(void *p, const unsigned int n){
 	x[0]=n&0xff,x[1]=(n>>8)&0xff,x[2]=(n>>16)&0xff,x[3]=(n>>24)&0xff;
 }
 #endif
-
-void write32be(void *p, const unsigned int n){
-	unsigned char *x=(unsigned char*)p;
-	x[3]=n&0xff,x[2]=(n>>8)&0xff,x[1]=(n>>16)&0xff,x[0]=(n>>24)&0xff;
-}
 
 #if defined(_WIN32) || (!defined(__GNUC__) && !defined(__clang__))
 #else

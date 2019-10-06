@@ -41,6 +41,7 @@ EXTERN const IID IID_ICryptoGetTextPassword_={0x23170F69,0x40C1,0x278A,{0x00,0x0
 EXTERN const IID IID_ICryptoGetTextPassword2_={0x23170F69,0x40C1,0x278A,{0x00,0x00,0x00,0x05,0x00,0x11,0x00,0x00}};
 
 EXTERN const IID IID_IArchiveExtractCallback_={0x23170F69,0x40C1,0x278A,{0x00,0x00,0x00,0x06,0x00,0x20,0x00,0x00}};
+EXTERN const IID IID_IArchiveOpenVolumeCallback_={0x23170F69,0x40C1,0x278A,{0x00,0x00,0x00,0x06,0x00,0x30,0x00,0x00}};
 EXTERN const IID IID_IInArchive_={0x23170F69,0x40C1,0x278A,{0x00,0x00,0x00,0x06,0x00,0x60,0x00,0x00}};
 EXTERN const IID IID_IArchiveUpdateCallback_={0x23170F69,0x40C1,0x278A,{0x00,0x00,0x00,0x06,0x00,0x80,0x00,0x00}};
 EXTERN const IID IID_IOutArchive_={0x23170F69,0x40C1,0x278A,{0x00,0x00,0x00,0x06,0x00,0xA0,0x00,0x00}};
@@ -91,7 +92,11 @@ bool WINAPI MakeSInStreamFile(SInStreamFile *self, const char *fname){
 	self->f = fopen(fname,"rb");
 	if(!self->f)return false;
 	self->vt = (IInStream_vt*)calloc(1,sizeof(IInStream_vt));
-	if(!self->vt)return false;
+	if(!self->vt){
+		if(self->f)fclose(self->f);
+		self->f=NULL;
+		return false;
+	}
 	self->vt->QueryInterface = SInStreamFile_QueryInterface;
 	self->vt->AddRef = SInStreamFile_AddRef;
 	self->vt->Release = SInStreamFile_Release;
@@ -146,7 +151,11 @@ bool MakeSInStreamMem(SInStreamMem *self, void *p, const unsigned int size){
 	self->m = mopen(p,size,NULL);
 	if(!self->m)return false;
 	self->vt = (IInStream_vt*)calloc(1,sizeof(IInStream_vt));
-	if(!self->vt)return false;
+	if(!self->vt){
+		mclose(self->m);
+		self->m=NULL;
+		return false;
+	}
 	self->vt->QueryInterface = SInStreamMem_QueryInterface;
 	self->vt->AddRef = SInStreamMem_AddRef;
 	self->vt->Release = SInStreamMem_Release;
@@ -278,7 +287,11 @@ bool MakeSOutStreamFile(SOutStreamFile *self, const char *fname, bool readable){
 	}
 	if(!self->f)return false;
 	self->vt = (IOutStream_vt*)calloc(1,sizeof(IOutStream_vt));
-	if(!self->vt)return false;
+	if(!self->vt){
+		if(self->f)fclose(self->f);
+		self->f=NULL;
+		return false;
+	}
 	self->vt->QueryInterface = SOutStreamFile_QueryInterface;
 	self->vt->AddRef = SOutStreamFile_AddRef;
 	self->vt->Release = SOutStreamFile_Release;
@@ -335,7 +348,11 @@ bool MakeSSequentialOutStreamMem(SSequentialOutStreamMem *self, void *p, const u
 	self->m = mopen(p,size,NULL);
 	if(!self->m)return false;
 	self->vt = (IOutStream_vt*)calloc(1,sizeof(IOutStream_vt));
-	if(!self->vt)return false;
+	if(!self->vt){
+		mclose(self->m);
+		self->m=NULL;
+		return false;
+	}
 	self->vt->QueryInterface = SSequentialOutStreamMem_QueryInterface;
 	self->vt->AddRef = SSequentialOutStreamMem_AddRef;
 	self->vt->Release = SSequentialOutStreamMem_Release;
@@ -438,9 +455,10 @@ static u32 WINAPI SCryptoGetTextPasswordFixed_Release(void* _self){
 static HRESULT WINAPI SCryptoGetTextPasswordFixed_CryptoGetTextPassword(void *_self, BSTR* password){
 	LZMA_UNUSED SCryptoGetTextPasswordFixed *self = (SCryptoGetTextPasswordFixed*)_self;
 	if(self->password){
-		*password = SysAllocStringLen(NULL,512);
+		int passwordlen = strlen(self->password);
+		*password = SysAllocStringLen(NULL,passwordlen+1);
 		u8* passwordStartAddr = ((u8*)*password)-4;
-		write32(passwordStartAddr, mbstowcs(*password, self->password, 512));
+		write32(passwordStartAddr, mbstowcs(*password, self->password, passwordlen+1));
 	}
 	return S_OK;
 }
@@ -488,9 +506,10 @@ static HRESULT WINAPI SCryptoGetTextPassword2Fixed_CryptoGetTextPassword2(void *
 	*passwordIsDefined = 0;
 	if(self->password){
 		*passwordIsDefined = 1;
-		*password = SysAllocStringLen(NULL,512);
+		int passwordlen = strlen(self->password);
+		*password = SysAllocStringLen(NULL,passwordlen+1);
 		u8* passwordStartAddr = ((u8*)*password)-4;
-		write32(passwordStartAddr, mbstowcs(*password, self->password, 512));
+		write32(passwordStartAddr, mbstowcs(*password, self->password, passwordlen+1));
 	}
 	return S_OK;
 }
@@ -511,12 +530,86 @@ bool MakeSCryptoGetTextPassword2Fixed(SCryptoGetTextPassword2Fixed *self, const 
 	return true;
 }
 
+static HRESULT WINAPI SArchiveOpenVolumeCallback_QueryInterface(void* _self, const GUID* iid, void** out_obj){
+	LZMA_UNUSED SArchiveOpenVolumeCallback *self = (SArchiveOpenVolumeCallback*)_self;
+	*out_obj = NULL;
+	return E_NOINTERFACE;
+}
+
+static u32 WINAPI SArchiveOpenVolumeCallback_AddRef(void* _self){
+	LZMA_UNUSED SArchiveOpenVolumeCallback *self = (SArchiveOpenVolumeCallback*)_self;
+	return ++self->refs;
+}
+
+static u32 WINAPI SArchiveOpenVolumeCallback_Release(void* _self){
+	LZMA_UNUSED SArchiveOpenVolumeCallback *self = (SArchiveOpenVolumeCallback*)_self;
+	if(--self->refs==0){
+		free(self->vt);
+		self->vt=NULL;
+		free(self->fname);
+		self->fname=NULL;
+	}
+	return self->refs;
+}
+
+static HRESULT WINAPI SArchiveOpenVolumeCallback_GetProperty(void* _self, PROPID propID, PROPVARIANT *value){
+	LZMA_UNUSED SArchiveOpenVolumeCallback *self = (SArchiveOpenVolumeCallback*)_self;
+	if(propID == kpidName || propID==kpidPath){
+		if(self->fname){
+			value->vt = VT_BSTR;
+			int fnamelen = strlen(self->fname);
+			value->bstrVal = SysAllocStringLen(NULL,fnamelen+1);
+			u8* startAddr = ((u8*)value->bstrVal)-4;
+			write32(startAddr, mbstowcs(value->bstrVal, self->fname, fnamelen+1));
+		}
+	}
+	return S_OK;
+}
+
+static HRESULT WINAPI SArchiveOpenVolumeCallback_GetStream(void* _self, const wchar_t *name, IInStream_ **inStream){
+	LZMA_UNUSED SArchiveOpenVolumeCallback *self = (SArchiveOpenVolumeCallback*)_self;
+	IInStream_* stream = (IInStream_*)calloc(1,sizeof(SInStreamFile));
+	size_t mbnamelen = wcslen(name)*4;
+	char *mbname = (char*)malloc(mbnamelen);
+	if(!mbname)return E_FAIL;
+	wcstombs(mbname,name,mbnamelen);
+	if(!MakeSInStreamFile((SInStreamFile*)stream,mbname)){
+		free(mbname);
+		stream->vt->Release(&stream);
+		return E_FAIL;
+	}
+	*inStream = stream; // WILL BE RELEASED AUTOMATICALLY.
+	free(mbname);
+	return S_OK;
+}
+
+bool MakeSArchiveOpenVolumeCallback(SArchiveOpenVolumeCallback *self, const char *fname){
+	self->vt = (IArchiveOpenVolumeCallback_vt*)calloc(1,sizeof(IArchiveOpenVolumeCallback_vt));
+	if(!self->vt)return false;
+	self->fname = NULL;
+	if(fname){
+		self->fname = (char*)malloc(strlen(fname)+1);
+		strcpy(self->fname, fname);
+	}
+	self->vt->QueryInterface = SArchiveOpenVolumeCallback_QueryInterface;
+	self->vt->AddRef = SArchiveOpenVolumeCallback_AddRef;
+	self->vt->Release = SArchiveOpenVolumeCallback_Release;
+	self->vt->GetProperty = SArchiveOpenVolumeCallback_GetProperty;
+	self->vt->GetStream = SArchiveOpenVolumeCallback_GetStream;
+	self->refs = 1;
+	return true;
+}
 
 static HRESULT WINAPI SArchiveOpenCallbackPassword_QueryInterface(void* _self, const GUID* iid, void** out_obj){
 	LZMA_UNUSED SArchiveOpenCallbackPassword *self = (SArchiveOpenCallbackPassword*)_self;
 	if(!memcmp(iid,&IID_ICryptoGetTextPassword_,sizeof(GUID))){
 		*out_obj = &self->setpassword;
 		self->setpassword.vt->AddRef(&self->setpassword);
+		return S_OK;
+	}
+	if(!memcmp(iid,&IID_IArchiveOpenVolumeCallback_,sizeof(GUID))){
+		*out_obj = &self->openvolume;
+		self->openvolume.vt->AddRef(&self->openvolume);
 		return S_OK;
 	}
 	*out_obj = NULL;
@@ -534,6 +627,7 @@ static u32 WINAPI SArchiveOpenCallbackPassword_Release(void* _self){
 		free(self->vt);
 		self->vt=NULL;
 		self->setpassword.vt->Release(&self->setpassword);
+		self->openvolume.vt->Release(&self->openvolume);
 	}
 	return self->refs;
 }
@@ -548,10 +642,11 @@ static HRESULT WINAPI SArchiveOpenCallbackPassword_SetCompleted(void* _self, con
 	return S_OK;
 }
 
-bool MakeSArchiveOpenCallbackPassword(SArchiveOpenCallbackPassword *self, const char *password){
+bool MakeSArchiveOpenCallbackPassword(SArchiveOpenCallbackPassword *self, const char *password, const char *fname){
 	self->vt = (IArchiveOpenCallback_vt*)calloc(1,sizeof(IArchiveOpenCallback_vt));
 	if(!self->vt)return false;
 	MakeSCryptoGetTextPasswordFixed(&self->setpassword,password);
+	MakeSArchiveOpenVolumeCallback(&self->openvolume,fname);
 	self->vt->QueryInterface = SArchiveOpenCallbackPassword_QueryInterface;
 	self->vt->AddRef = SArchiveOpenCallbackPassword_AddRef;
 	self->vt->Release = SArchiveOpenCallbackPassword_Release;
@@ -887,11 +982,11 @@ int lzmaDestroyArchiver(void **archiver,int encode){
 	return 0;
 }
 
-int lzmaOpenArchive(void *archiver,void *reader,const char *password){
+int lzmaOpenArchive(void *archiver,void *reader,const char *password,const char *fname){
 	if(!h7z||!archiver)return -1;
 	u64 maxCheckStartPosition=0;
 	SArchiveOpenCallbackPassword scallback;
-	MakeSArchiveOpenCallbackPassword(&scallback,password);
+	MakeSArchiveOpenCallbackPassword(&scallback,password,fname);
 	int r=((IInArchive_*)archiver)->vt->Open(archiver, (IInStream_*)reader, &maxCheckStartPosition, (IArchiveOpenCallback_*)&scallback);
 	scallback.vt->Release(&scallback);
 	return r;

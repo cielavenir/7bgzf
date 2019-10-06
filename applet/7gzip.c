@@ -17,6 +17,8 @@ zlibrawstdio2: RFC 1951 (deflate)
 unsigned char buf[BUFLEN];
 unsigned char __compbuf[COMPBUFLEN],__decompbuf[DECOMPBUFLEN];
 
+unsigned int read32(const void *p);
+void write32(void *p, const unsigned int n);
 #if 0
 unsigned int read32(const void *p){
 	const unsigned char *x=(const unsigned char*)p;
@@ -65,7 +67,7 @@ static int _compress(FILE *fin,FILE *fout,int level,int sevenzip){
 			h.f=fin;
 			h.crc=0;
 			h.size=0;
-			lzmaCodeCallback(coder,&h,fread2,NULL,stdout,fwrite2,NULL);
+			lzmaCodeCallback(coder,&h,fread2,fin==stdin ? NULL : (tClose)fclose,stdout,fwrite2,fout==stdout ? NULL : (tClose)fclose);
 			lzmaDestroyCoder(&coder);
 			write32(buf,h.crc);
 			fwrite(buf,1,4,fout);

@@ -14,6 +14,8 @@
 #include "../lib/zlibutil.h"
 unsigned char buf[BUFLEN];
 
+unsigned int read32(const void *p);
+void write32(void *p, const unsigned int n);
 #if 0
 unsigned int read32(const void *p){
 	const unsigned char *x=(const unsigned char*)p;

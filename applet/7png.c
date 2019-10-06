@@ -81,7 +81,7 @@ static int _compress(FILE *in, FILE *out, int level, int method, bool strip){
 			tbl_last++;
 			fread(buf,1,4,in);
 		}else if((level||cgbi) && type==fourcc('I','E','N','D')){
-			fprintf(stderr,"compressed length=%d\n",compsize);
+			fprintf(stderr,"compressed length=%d\n",(int)compsize);
 			size_t bufsize=compsize + (compsize>>1);
 
 			int declen=0;
@@ -217,87 +217,72 @@ static int _compress(FILE *in, FILE *out, int level, int method, bool strip){
 				return -1;
 			}
 
-			unsigned int adler=1;
-			adler=adler32(adler,__decompbuf,declen);
-			compsize=bufsize;
+			zlibutil_buffer zlibbuf;
+			memset(&zlibbuf,0,sizeof(zlibutil_buffer));
+			zlibbuf.dest=__compbuf;
+			zlibbuf.destLen=bufsize;
+			zlibbuf.source=__decompbuf;
+			zlibbuf.sourceLen=declen;
+			zlibbuf.encode=1;
+			zlibbuf.level=level;
+			zlibbuf.rfc1950=1;
 
 			if(method==DEFLATE_ZLIB){
-				int r=zlib_deflate(__compbuf,&compsize,__decompbuf,declen,level);
-				if(r){
-					fprintf(stderr,"deflate %d\n",r);
-					return 1;
-				}
-			}
-			if(method==DEFLATE_7ZIP){
-				if(coder){
-					int r=lzmaCodeOneshot(coder,__decompbuf,declen,__compbuf,&compsize);
-					if(r){
-						fprintf(stderr,"NDeflate::CCoder::Code %d\n",r);
-						return 1;
-					}
-				}
-			}
-			if(method==DEFLATE_ZOPFLI){
-				int r=zopfli_deflate(__compbuf,&compsize,__decompbuf,declen,level);
-				if(r){
-					fprintf(stderr,"zopfli_deflate %d\n",r);
-					return 1;
-				}
-			}
-			if(method==DEFLATE_MINIZ){
-				int r=miniz_deflate(__compbuf,&compsize,__decompbuf,declen,level);
-				if(r){
-					fprintf(stderr,"miniz_deflate %d\n",r);
-					return 1;
-				}
-			}
-			if(method==DEFLATE_SLZ){
+				zlibbuf.func = zlib_deflate;
+			}else if(method==DEFLATE_7ZIP){
+				zlibbuf.func = lzma_deflate;
+			}else if(method==DEFLATE_ZOPFLI){
+				zlibbuf.func = zopfli_deflate;
+			}else if(method==DEFLATE_MINIZ){
+				zlibbuf.func = miniz_deflate;
+			}else if(method==DEFLATE_SLZ){
 				slz_initialize();
-				int r=slz_deflate(__compbuf,&compsize,__decompbuf,declen,level);
-				if(r){
-					fprintf(stderr,"slz_deflate %d\n",r);
-					return 1;
-				}
-			}
-			if(method==DEFLATE_LIBDEFLATE){
-				int r=libdeflate_deflate(__compbuf,&compsize,__decompbuf,declen,level);
-				if(r){
-					fprintf(stderr,"libdeflate_deflate %d\n",r);
-					return 1;
-				}
-			}
-			if(method==DEFLATE_ZLIBNG){
-				int r=zlibng_deflate(__compbuf,&compsize,__decompbuf,declen,level);
-				if(r){
-					fprintf(stderr,"zng_deflate %d\n",r);
-					return 1;
-				}
-			}
-			if(method==DEFLATE_IGZIP){
-				int r=igzip_deflate(__compbuf,&compsize,__decompbuf,declen,level);
-				if(r){
-					fprintf(stderr,"isal_deflate %d\n",r);
-					return 1;
-				}
+				zlibbuf.func = slz_deflate;
+			}else if(method==DEFLATE_LIBDEFLATE){
+				zlibbuf.func = libdeflate_deflate;
+			}else if(method==DEFLATE_ZLIBNG){
+				zlibbuf.func = zlibng_deflate;
+			}else if(method==DEFLATE_IGZIP){
+				zlibbuf.func = igzip_deflate;
 			}
 
-			write32be(buf,2+compsize+4);
+			zlibutil_buffer_code(&zlibbuf);
+
+			if(zlibbuf.ret){
+				if(method==DEFLATE_ZLIB){
+					fprintf(stderr,"deflate %d\n",zlibbuf.ret);
+				}else if(method==DEFLATE_7ZIP){
+					fprintf(stderr,"NDeflate::CCoder::Code %d\n",zlibbuf.ret);
+				}else if(method==DEFLATE_ZOPFLI){
+					fprintf(stderr,"zopfli_deflate %d\n",zlibbuf.ret);
+				}else if(method==DEFLATE_MINIZ){
+					fprintf(stderr,"miniz_deflate %d\n",zlibbuf.ret);
+				}else if(method==DEFLATE_SLZ){
+					fprintf(stderr,"slz_deflate %d\n",zlibbuf.ret);
+				}else if(method==DEFLATE_LIBDEFLATE){
+					fprintf(stderr,"libdeflate_deflate %d\n",zlibbuf.ret);
+				}else if(method==DEFLATE_ZLIBNG){
+					fprintf(stderr,"zng_deflate %d\n",zlibbuf.ret);
+				}else if(method==DEFLATE_IGZIP){
+					fprintf(stderr,"isal_deflate %d\n",zlibbuf.ret);
+				}
+				free(__compbuf);
+				return 1;
+			}
+
+			write32be(buf,zlibbuf.destLen);
 			unsigned int crc=0;
 			write32(buf+4,fourcc('I','D','A','T'));
 			crc=crc32(crc,buf+4,4);
 			fwrite(buf,1,8,out);
 
-			buf[0]=0x78,buf[1]=0xda;
-			crc=crc32(crc,buf,2);
-			fwrite(buf,1,2,out);
-			crc=crc32(crc,__compbuf,compsize);
-			fwrite(__compbuf,1,compsize,out);
+			crc=crc32(crc,zlibbuf.dest,zlibbuf.destLen);
+			fwrite(zlibbuf.dest,1,zlibbuf.destLen,out);
 
-			write32be(buf,adler);
-			crc=crc32(crc,buf,4);
-			write32be(buf+4,crc);
-			fwrite(buf,1,8,out);
-			fprintf(stderr,"recompressed length=%d\n",2+compsize+4);
+			write32be(buf,crc);
+			fwrite(buf,1,4,out);
+			fprintf(stderr,"recompressed length=%d\n",(int)zlibbuf.destLen);
+			free(__compbuf);
 
 			write32be(buf,0);
 			write32(buf+4,fourcc('I','E','N','D'));

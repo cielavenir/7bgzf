@@ -25,7 +25,7 @@ static int _compress(FILE *fin,FILE *fout,int level,int sevenzip){
 		void *coder=NULL;
 		lzmaCreateCoder(&coder,0x040108,1,level);
 		if(coder){
-			lzmaCodeCallback(coder,fin,fread2,fclose,fout,fwrite2,NULL);
+			lzmaCodeCallback(coder,fin,fread2,fin==stdin ? NULL : (tClose)fclose,fout,fwrite2,fout==stdout ? NULL : (tClose)fclose);
 			fflush(fout);
 			lzmaDestroyCoder(&coder);
 		}
@@ -88,7 +88,7 @@ static int _decompress(FILE *fin,FILE *fout){
 		void *coder=NULL;
 		lzmaCreateCoder(&coder,0x040108,0,0);
 		if(coder){
-			lzmaCodeCallback(coder,fin,fread2,NULL,fout,fwrite2,NULL);
+			lzmaCodeCallback(coder,fin,fread2,fin==stdin ? NULL : (tClose)fclose,fout,fwrite2,fout==stdout ? NULL : (tClose)fclose);
 			lzmaDestroyCoder(&coder);
 		}
 		lzmaClose7z();

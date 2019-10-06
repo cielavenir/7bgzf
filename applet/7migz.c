@@ -24,6 +24,7 @@
 #include "../lib/zlibutil.h"
 unsigned char buf[BUFLEN];
 
+unsigned int read32(const void *p);
 #if 0
 unsigned int read32(const void *p){
 	const unsigned char *x=(const unsigned char*)p;
@@ -34,6 +35,7 @@ unsigned short read16(const void *p){
 	const unsigned char *x=(const unsigned char*)p;
 	return x[0]|(x[1]<<8);
 }
+void write32(void *p, const unsigned int n);
 #if 0
 void write32(void *p, const unsigned int n){
 	unsigned char *x=(unsigned char*)p;
@@ -99,7 +101,7 @@ static int _compress(FILE *in, FILE *out, int level, int method, int nthreads){
 
 	//void* coder=NULL;
 	//lzmaCreateCoder(&coder,0x040108,1,level);
-	int i=0,offset=0;
+	int i=0;
 	const int chkpoint_interval=64;
 	int chkpoint=chkpoint_interval;
 	pthread_t *threads=(pthread_t*)alloca(sizeof(pthread_t)*nthreads);
@@ -192,7 +194,6 @@ static int _compress(FILE *in, FILE *out, int level, int method, int nthreads){
 
 static int _decompress(FILE *in, FILE *out, int nthreads){
 	int readlen,i=0;
-	long long filepos=0,rawpos=0;
 	const int header_buffer_interval = 128;
 
 	const int chkpoint_interval=256;

@@ -18,6 +18,7 @@
 #include "../lib/zlibutil.h"
 unsigned char buf[BUFLEN];
 
+unsigned int read32(const void *p);
 #if 0
 unsigned int read32(const void *p){
 	const unsigned char *x=(const unsigned char*)p;
@@ -28,6 +29,7 @@ unsigned short read16(const void *p){
 	const unsigned char *x=(const unsigned char*)p;
 	return x[0]|(x[1]<<8);
 }
+void write32(void *p, const unsigned int n);
 #if 0
 void write32(void *p, const unsigned int n){
 	unsigned char *x=(unsigned char*)p;
@@ -232,7 +234,6 @@ if(fBGZF_BUFSHORTAGE_FALLBACK){
 
 static int _decompress(FILE *in, FILE *out, int nthreads){
 	int readlen,i=0;
-	long long filepos=0,rawpos=0;
 	const int header_buffer_interval = 64;
 
 	const int chkpoint_interval=256;

@@ -19,6 +19,7 @@ unsigned long long int read64(const void *p){
 	const unsigned char *x=(const unsigned char*)p;
 	return x[0]|(x[1]<<8)|(x[2]<<16)|((unsigned int)x[3]<<24)|( (unsigned long long int)(x[4]|(x[5]<<8)|(x[6]<<16)|((unsigned int)x[7]<<24)) <<32);
 }
+unsigned int read32(const void *p);
 #if 0
 unsigned int read32(const void *p){
 	const unsigned char *x=(const unsigned char*)p;
@@ -34,6 +35,7 @@ void write64(void *p, const unsigned long long int n){
 	x[0]=n&0xff,x[1]=(n>>8)&0xff,x[2]=(n>>16)&0xff,x[3]=(n>>24)&0xff,
 	x[4]=(n>>32)&0xff,x[5]=(n>>40)&0xff,x[6]=(n>>48)&0xff,x[7]=(n>>56)&0xff;
 }
+void write32(void *p, const unsigned int n);
 #if 0
 void write32(void *p, const unsigned int n){
 	unsigned char *x=(unsigned char*)p;
@@ -67,7 +69,7 @@ void *_memmem(const void *s1, size_t siz1, const void *s2, size_t siz2);
 #define RESERVED     0xE0 /* bits 5..7: reserved */
 
 static int _read_gz_header(unsigned char *data, int size, int *extra_off, int *extra_len, int *block_len){
-	int method, flags, n, len;
+	int method, flags, n;
 	if(size < 2) return 0;
 	if(data[0] != 0x1f || data[1] != 0x8b) return 0;
 	if(size < 4) return 0;
@@ -77,7 +79,7 @@ static int _read_gz_header(unsigned char *data, int size, int *extra_off, int *e
 	n = 4 + 6; // Skip 6 bytes
 	*extra_off = n + 2;
 	*extra_len = 0;
-	if(flags & EXTRA_FIELD);
+	//if(flags & EXTRA_FIELD);
 	if(flags & ORIG_NAME) while(n < size && data[n++]);
 	if(flags & COMMENT) while(n < size && data[n++]);
 	if(flags & HEAD_CRC){
@@ -92,7 +94,7 @@ static int _compress(FILE *in, FILE *out, int level, int method, int nthreads){
 
 	//void* coder=NULL;
 	//lzmaCreateCoder(&coder,0x040108,1,level);
-	int i=0,offset=0;
+	int i=0;
 	const int chkpoint_interval=64;
 	int chkpoint=chkpoint_interval;
 	pthread_t *threads=(pthread_t*)alloca(sizeof(pthread_t)*nthreads);
@@ -191,7 +193,6 @@ static int _compress(FILE *in, FILE *out, int level, int method, int nthreads){
 
 static int _decompress(FILE *in, FILE *out, int nthreads){
 	int readlen,i=0;
-	long long filepos=0,rawpos=0;
 	//int header_buffer_interval = 32;
 
 	const int chkpoint_interval=256;

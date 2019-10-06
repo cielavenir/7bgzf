@@ -22,6 +22,7 @@ unsigned long long int read64(const void *p){
 	return x[0]|(x[1]<<8)|(x[2]<<16)|((unsigned int)x[3]<<24)|( (unsigned long long int)(x[4]|(x[5]<<8)|(x[6]<<16)|((unsigned int)x[7]<<24)) <<32);
 }
 
+unsigned int read32(const void *p);
 #if 0
 unsigned int read32(const void *p){
 	const unsigned char *x=(const unsigned char*)p;
@@ -38,6 +39,7 @@ void write64(void *p, const unsigned long long int n){
 	x[0]=n&0xff,x[1]=(n>>8)&0xff,x[2]=(n>>16)&0xff,x[3]=(n>>24)&0xff,
 	x[4]=(n>>32)&0xff,x[5]=(n>>40)&0xff,x[6]=(n>>48)&0xff,x[7]=(n>>56)&0xff;
 }
+void write32(void *p, const unsigned int n);
 #if 0
 void write32(void *p, const unsigned int n){
 	unsigned char *x=(unsigned char*)p;
@@ -309,7 +311,7 @@ static int _decompress(FILE *in, FILE *out, int nthreads){
 	block_size=read16be(buf+offset+4+1);
 	if(fseeko(in,-16,SEEK_END)==-1){fprintf(stderr,"input is not seekable\n");return 1;}
 	fread(buf+2048,1,16,in);
-	unsigned long long fsize=read64be(buf+2048);
+	//unsigned long long fsize=read64be(buf+2048);
 	unsigned long long block_offset=read64be(buf+2048+8);
 	fseeko(in,block_offset,SEEK_SET);
 	fread(buf,4,1,in);

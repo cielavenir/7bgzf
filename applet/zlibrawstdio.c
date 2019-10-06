@@ -46,7 +46,7 @@ static int _compress(FILE *fin,FILE *fout,int level,int sevenzip){
 			han h;
 			h.f=fin;
 			h.crc=1;
-			lzmaCodeCallback(coder,&h,fread2,NULL,fout,fwrite2,NULL);
+			lzmaCodeCallback(coder,&h,fread2,fin==stdin ? NULL : (tClose)fclose,fout,fwrite2,fout==stdout ? NULL : (tClose)fclose);
 			unsigned char buf[4];
 			write32be(buf,h.crc);
 			fwrite(buf,1,4,fout);

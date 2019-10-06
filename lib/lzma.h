@@ -107,7 +107,8 @@ arctype (as of 7-zip 19.00):
 */
 int lzmaCreateArchiver(void **archiver,unsigned char arctype,int encode,int level);
 int lzmaDestroyArchiver(void **archiver,int encode);
-int lzmaOpenArchive(void *archiver,void *reader,const char *password);
+//fname can be used to assist opening multi-volume archive
+int lzmaOpenArchive(void *archiver,void *reader,const char *password,const char *fname);
 int lzmaCloseArchive(void *archiver);
 int lzmaGetArchiveFileNum(void *archiver,unsigned int *numItems);
 int lzmaGetArchiveFileProperty(void *archiver,unsigned int index,int kpid,PROPVARIANT *prop);
@@ -344,6 +345,16 @@ typedef struct{
 
 typedef struct{
 	LZMAIUnknownIMP
+	HRESULT (WINAPI*GetProperty)(void* self, PROPID propID, PROPVARIANT *value);
+	HRESULT (WINAPI*GetStream)(void* self, const wchar_t *name, IInStream_ **inStream);
+} IArchiveOpenVolumeCallback_vt;
+
+typedef struct{
+	IArchiveOpenVolumeCallback_vt *vt;
+} IArchiveOpenVolumeCallback_;
+
+typedef struct{
+	LZMAIUnknownIMP
 	HRESULT (WINAPI*SetTotal)(void* self, u64 total);
 	HRESULT (WINAPI*SetCompleted)(void* self, const u64 *completedValue);
 	HRESULT (WINAPI*GetStream)(void* self, u32 index, /*ISequentialOutStream_*/IOutStream_ **outStream, s32 askExtractMode);
@@ -499,13 +510,23 @@ typedef struct{
 bool MakeSCryptoGetTextPassword2Fixed(SCryptoGetTextPassword2Fixed *self, const char *password);
 
 typedef struct{
+	IArchiveOpenVolumeCallback_vt *vt;
+	u32 refs;
+	char *fname;
+} SArchiveOpenVolumeCallback;
+
+//fname can be null
+bool MakeSArchiveOpenVolumeCallback(SArchiveOpenVolumeCallback *self, const char *fname);
+
+typedef struct{
 	IArchiveOpenCallback_vt *vt;
 	u32 refs;
 	SCryptoGetTextPasswordFixed setpassword;
+	SArchiveOpenVolumeCallback openvolume;
 } SArchiveOpenCallbackPassword;
 
-//password can be null
-bool MakeSArchiveOpenCallbackPassword(SArchiveOpenCallbackPassword *self, const char *password);
+//password/fname can be null
+bool MakeSArchiveOpenCallbackPassword(SArchiveOpenCallbackPassword *self, const char *password, const char *fname);
 
 typedef struct{
 	IArchiveExtractCallback_vt *vt;

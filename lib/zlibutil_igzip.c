@@ -67,7 +67,7 @@ int igzip_deflate(
 	struct isal_zstream z;
 	isal_deflate_stateless_init(&z);
 
-	z.next_in = source;
+	z.next_in = (unsigned char*)source;
 	z.avail_in = sourceLen;
 	z.next_out = dest;
 	z.avail_out = *destLen;
@@ -102,7 +102,7 @@ int igzip_inflate(
 	struct inflate_state z;
 	isal_inflate_init(&z);
 
-	z.next_in = source;
+	z.next_in = (unsigned char*)source;
 	z.avail_in = sourceLen;
 	z.next_out = dest;
 	z.avail_out = *destLen;
