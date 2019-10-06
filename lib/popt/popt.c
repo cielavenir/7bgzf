@@ -1027,7 +1027,7 @@ int poptSaveString(const char *** argvp,
 }
 
 /*@unchecked@*/
-static unsigned seed = 0;
+//static unsigned seed = 0;
 
 typedef int64_t * poptStack_t;
 
