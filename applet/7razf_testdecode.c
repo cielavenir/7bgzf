@@ -1020,6 +1020,6 @@ int inflate_testdecode(z_streamp strm, int flush)
     if (((in == 0 && out == 0) || flush == Z_FINISH) && ret == Z_OK)
         ret = Z_BUF_ERROR;
 
-	*final-=(1<<(8-bits_final));
+    *final-=(1<<(8-bits_final));
     return ret_bits;
 }

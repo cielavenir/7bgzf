@@ -25,7 +25,11 @@ typedef int (*tClose)(void *);
 #if defined(_WIN32) || (!defined(__GNUC__) && !defined(__clang__))
 	#include <propidl.h> // PropVariantClear
 	#include <oleauto.h> // SysAllocStr etc
-	#define LZMA_UNUSED
+	#if (!defined(__GNUC__) && !defined(__clang__))
+		#define LZMA_UNUSED
+	#else
+		#define LZMA_UNUSED __attribute__((unused))
+	#endif
 	#define LZMAIUnknownIMP HRESULT (WINAPI*QueryInterface)(void*, const GUID*, void**);u32 (WINAPI*AddRef)(void*);u32 (WINAPI*Release)(void*);
 #else
 	#include "lzma_windows.h"
