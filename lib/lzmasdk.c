@@ -894,7 +894,7 @@ int lzmaOpen7z(){
 	pSetCodecs=(funcSetCodecs)GetProcAddress(h7z,"SetCodecs");
 #endif
 #endif
-	if(!pCreateArchiver||!pCreateCoder){
+	if(!pCreateArchiver||!pCreateCoder||!pSetCodecs){
 #ifndef NODLOPEN
 		FreeLibrary(h7z);
 #endif
@@ -904,7 +904,7 @@ int lzmaOpen7z(){
 	return 0; //now you can call 7z.so.
 }
 bool lzma7zAlive(){
-	return h7z&&pCreateArchiver&&pCreateCoder;
+	return h7z&&pCreateArchiver&&pCreateCoder&&pSetCodecs;
 }
 int lzmaClose7z(){
 	if(!h7z)return 1;
@@ -1159,7 +1159,7 @@ int lzmaCodeCallback(void *coder, void *hin, tRead pRead_in, tClose pClose_in, v
 		MakeSInStreamGeneric(&sin,hin,pRead_in,pClose_in,NULL,NULL);
 		SSequentialOutStreamGeneric sout;
 		MakeSSequentialOutStreamGeneric(&sout,hout,pWrite_out,pClose_out);
-		HRESULT r=((ICompressCoder_*)coder)->vt->Code(coder,(IInStream_*)&sin, (IOutStream_*)&sout, (UINT64*)&isize, (UINT64*)osize, NULL);
+		HRESULT r=((ICompressCoder_*)coder)->vt->Code(coder,(IInStream_*)&sin, (IOutStream_*)&sout, (UINT64*)&isize, (UINT64*)&osize, NULL);
 		sin.vt->Release(&sin);
 		sout.vt->Release(&sout);
 		if(r!=S_OK)return r;
