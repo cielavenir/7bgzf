@@ -1,5 +1,3 @@
-#include "../../zutil.h"
-
 #if defined(__linux__)
 //# include <sys/auxv.h>
 //# include <asm/hwcap.h>
@@ -7,6 +5,10 @@
 #elif defined(_WIN32)
 # include <winapifamily.h>
 #endif
+
+#undef likely
+#undef unlikely
+#include "../../zutil.h"
 
 #if 0
 static int arm_has_crc32() {
