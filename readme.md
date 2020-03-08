@@ -17,4 +17,4 @@
 
 - on-the-fly conversion of compressed files
 
-I have not mentioned explicitly in the paper, but that conversion means [PetaGene](https://www.petagene.com/). They say they provide virtual filesystem via LD_PRELOAD.
+I have not mentioned explicitly in the paper, but that conversion means [PetaGene](https://www.petagene.com/). They say they provide virtual filesystem via LD_PRELOAD. But I was not able to get evaluation copy - they say no personal evaluation.
