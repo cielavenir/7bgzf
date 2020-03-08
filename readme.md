@@ -12,3 +12,9 @@
     - Example: `BGZF_METHOD=libdeflate12 LD_PRELOAD=./7bgzf.so samtools view ...`
 
 - Detailed instruction for my ARM assessment should be available on the paper supplementary data.
+
+## Side notes (oh I can write this as the paper is published)
+
+- on-the-fly conversion of compressed files
+
+I have not mentioned explicitly in the paper, but that conversion means [PetaGene](https://www.petagene.com/). They say they provide virtual filesystem via LD_PRELOAD.
