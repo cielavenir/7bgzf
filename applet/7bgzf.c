@@ -107,6 +107,7 @@ static int _read_gz_header(unsigned char *data, int size, int *extra_off, int *e
 	}else if(*extra_len==20 && !memcmp(data+*extra_off,"IG\x10\x00",4)){
 		// https://github.com/vinlyx/mgzip [v1]
 		// 1400 IG 1000 hdrftrcmpsize(8) decompsize(8)
+		// hdrftrcmpsize should not exceed 4GB. this is block size, not file size.
 		*block_len = read64(data+*extra_off+4);
 	}else if(*extra_len==8 && !memcmp(data+*extra_off,"IG\x04\x00",4)){
 		// https://github.com/vinlyx/mgzip [v2]
