@@ -5,6 +5,7 @@
 # CC=x86_64-w64-mingw32-gcc LIBS="-static-libgcc -Wl,-Bstatic,--whole-archive -lwinpthread -Wl,--no-whole-archive,-Bdynamic -lole32 -loleaut32" CFLAGS="-march=core2 -mfpmath=sse -mmmx -msse -msse2 -msse3 -mno-ssse3" arch=mingw host_cpu=x86_64 ZLIBNG_X86=1
 
 SOURCES_7razf="applet/7razf_testdecode.c"
+SOURCES_7dictzip="applet/7razf_testdecode.c"
 SOURCES_7gzinga="lib/memmem.c"
 
 if [ -z "${CC}" ]; then
@@ -24,7 +25,7 @@ SOURCES_LIB="lib/zopfli/*.c lib/popt/*.c lib/zlib/*.c lib/zlib-ng/*.c lib/zlib-n
 mkdir -p bin
 
 make -C lib/isa-l -f Makefile.unx lib
-for i in 7bgzf 7razf 7gzip 7gzinga 7png 7migz 7ciso 7daxcr zlibrawstdio zlibrawstdio2
+for i in 7bgzf 7razf 7gzip 7gzinga 7png 7migz 7dictzip 7ciso 7daxcr zlibrawstdio zlibrawstdio2
 do
 	# ZopfliCalculateEntropy uses log, which is implemented in libm.
 	${CC} -O2 -std=gnu99 ${CFLAGS} -DSTANDALONE -o bin/${i} applet/${i}.c $(eval echo '$'SOURCES_${i}) ${SOURCES_LIB} lib/isa-l/bin/isa-l.a ${LIBS}
