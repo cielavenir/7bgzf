@@ -41,7 +41,11 @@ void write32(void *p, const unsigned int n){
 #include "../lib/lzma.h"
 #include "../lib/popt/popt.h"
 
+#ifdef NOTIMEOFDAY
+#include <time.h>
+#else
 #include <sys/time.h>
+#endif
 
 #define MAX_IDAT 1024
 static unsigned char* tbl[MAX_IDAT];
@@ -427,9 +431,15 @@ int _7png(const int argc, const char **argv){
 		{poptPrintHelp(optCon, stderr, 0);poptFreeContext(optCon);return -1;}
 	poptFreeContext(optCon);
 
-	fprintf(stderr,"compression level = %d ",level_sum);
+#ifdef NOTIMEOFDAY
+	time_t tstart,tend;
+	time(&tstart);
+#else
+
 	struct timeval tstart,tend;
 	gettimeofday(&tstart,NULL);
+#endif
+	fprintf(stderr,"compression level = %d ",level_sum);
 	int ret=0;
 	if(zlib){
 		fprintf(stderr,"(zlib)\n");
@@ -464,7 +474,12 @@ int _7png(const int argc, const char **argv){
 		fprintf(stderr,"(strip)\n");
 		ret=_compress(stdin,stdout,0,0,mode);
 	}
+#ifdef NOTIMEOFDAY
+	time(&tend);
+	fprintf(stderr,"ellapsed time: %d sec\n",tend-tstart);
+#else
 	gettimeofday(&tend,NULL);
 	fprintf(stderr,"ellapsed time: %.6f sec\n",(tend.tv_sec+tend.tv_usec*0.000001)-(tstart.tv_sec+tstart.tv_usec*0.000001));
+#endif
 	return ret;
 }

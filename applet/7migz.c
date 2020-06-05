@@ -2,15 +2,6 @@
 // https://engineering.linkedin.com/blog/2019/02/migz-for-compression-and-decompression
 // https://github.com/linkedin/migz
 
-// BGZF
-// 0600 BG hdrftrcmpsize-1(2)
-// MiGz
-// 0800 MZ 0400 cmpsize(4)
-// https://github.com/jerodsanto/mgzip
-// 0400 hdrftrcmpsize(3) 7d
-// https://github.com/vinlyx/mgzip
-// 1400 IG 1000 hdrftrcmpsize(8) decompsize(8) // this 8 is too long I suppose...
-
 // parallel compression is supported.
 // parallel decompression is supported.
 
@@ -23,6 +14,11 @@
 #include <sys/stat.h>
 #include "../lib/zlibutil.h"
 unsigned char buf[BUFLEN];
+
+unsigned long long int read64(const void *p){
+	const unsigned char *x=(const unsigned char*)p;
+	return x[0]|(x[1]<<8)|(x[2]<<16)|((unsigned int)x[3]<<24)|( (unsigned long long int)(x[4]|(x[5]<<8)|(x[6]<<16)|((unsigned int)x[7]<<24)) <<32);
+}
 
 unsigned int read32(const void *p);
 #if 0
@@ -54,8 +50,15 @@ void write16(void *p, const unsigned short n){
 #include "../lib/lzma.h"
 #include "../lib/popt/popt.h"
 
+#ifdef NOTIMEOFDAY
+#include <time.h>
+#else
 #include <sys/time.h>
+#endif
+
+#ifndef BGZF_ST
 #include <pthread.h>
+#endif
 
 // gzip flag byte
 #define ASCII_FLAG   0x01 /* bit 0 set: file probably ascii text */
@@ -76,16 +79,15 @@ static int _read_gz_header(unsigned char *data, int size, int *extra_off, int *e
 	n = 4 + 6; // Skip 6 bytes
 	*extra_off = n + 2;
 	*extra_len = 0;
+	*block_len = 0;
 	if(flags & EXTRA_FIELD){
 		if(size < n + 2) return 0;
 		len = read16(data+n);
 		n += 2;
 		*extra_off = n;
-		if(len!=8 || memcmp(data+n,"MZ\x04\x00",4))return 0;
-		n += 4;
-		*block_len = read32(data+n);
-		n += 4;
-		*extra_len = n - (*extra_off);
+		*extra_len = len;
+		if(size < n + len) return 0;
+		n += len;
 	}
 	if(flags & ORIG_NAME) while(n < size && data[n++]);
 	if(flags & COMMENT) while(n < size && data[n++]);
@@ -93,18 +95,43 @@ static int _read_gz_header(unsigned char *data, int size, int *extra_off, int *e
 		if(n + 2 > size) return 0;
 		n += 2;
 	}
+	if(*extra_len==6 && !memcmp(data+*extra_off,"BC\x02\x00",4)){
+		// BGZF: 0600 BC 0200 hdrftrcmpsize-1(2)
+		*block_len = read16(data+*extra_off+4)+1;
+	}else if(*extra_len==8 && !memcmp(data+*extra_off,"MZ\x04\x00",4)){
+		// MiGz: 0800 MZ 0400 cmpsize(4)
+		*block_len = read32(data+*extra_off+4)+n+8; // adding header and footer size
+	}else if(*extra_len==20 && !memcmp(data+*extra_off,"IG\x10\x00",4)){
+		// https://github.com/vinlyx/mgzip [v1]
+		// 1400 IG 1000 hdrftrcmpsize(8) decompsize(8)
+		*block_len = read64(data+*extra_off+4);
+	}else if(*extra_len==8 && !memcmp(data+*extra_off,"IG\x04\x00",4)){
+		// https://github.com/vinlyx/mgzip [v2]
+		// 0800 IG 0400 hdrftrcmpsize(4)
+		*block_len = read32(data+*extra_off+4);
+	}else if(*extra_len==4 && data[*extra_off+3]==0x7d){
+		// https://github.com/jerodsanto/mgzip
+		// 0400 hdrftrcmpsize(3) 7d
+		*block_len = read32(data+*extra_off)&0xffffff;
+	}else{
+		return 0;
+	}
 	return n;
 }
 
-static int _compress(FILE *in, FILE *out, int level, int method, int nthreads){
-	const int block_size=512*1024;
+static int _compress(FILE *in, FILE *out, int level, int method, int nthreads, int bsize){
+	const int block_size=bsize*1024;
 
 	//void* coder=NULL;
 	//lzmaCreateCoder(&coder,0x040108,1,level);
 	int i=0;
 	const int chkpoint_interval=64;
 	int chkpoint=chkpoint_interval;
+#ifndef BGZF_ST
 	pthread_t *threads=(pthread_t*)alloca(sizeof(pthread_t)*nthreads);
+#else
+	nthreads=1;
+#endif
 	for(;/*i<total_block*/;i+=nthreads){
 		zlibutil_buffer *zlibbuf_main_thread=NULL;
 		int j=0;
@@ -134,7 +161,9 @@ static int _compress(FILE *in, FILE *out, int level, int method, int nthreads){
 			zlibbuf->encode = 1;
 			zlibbuf->level = level;
 			if(j<nthreads-1){
+#ifndef BGZF_ST
 				pthread_create(&threads[j],NULL,(void*(*)(void*))zlibutil_buffer_code,zlibbuf);
+#endif
 			}else{
 				zlibbuf_main_thread=zlibbuf;
 				zlibutil_buffer_code(zlibbuf);
@@ -144,7 +173,9 @@ static int _compress(FILE *in, FILE *out, int level, int method, int nthreads){
 		for(int j0=0;j0<j;j0++){
 			zlibutil_buffer *zlibbuf;
 			if(j0<nthreads-1){
+#ifndef BGZF_ST
 				pthread_join(threads[j0],(void**)&zlibbuf);
+#endif
 			}else{
 				zlibbuf=zlibbuf_main_thread;
 			}
@@ -198,7 +229,11 @@ static int _decompress(FILE *in, FILE *out, int nthreads){
 
 	const int chkpoint_interval=256;
 	int chkpoint=chkpoint_interval;
+#ifndef BGZF_ST
 	pthread_t *threads=(pthread_t*)alloca(sizeof(pthread_t)*nthreads);
+#else
+	nthreads=1;
+#endif
 	for(;;i+=nthreads){
 		zlibutil_buffer *zlibbuf_main_thread=NULL;
 		int j=0;
@@ -210,7 +245,6 @@ static int _decompress(FILE *in, FILE *out, int nthreads){
 				fprintf(stderr,"not MiGz or corrupted\n");
 				return -1;
 			}
-			block_len+=n+8; // adding header and footer size
 			if(block_len>BUFLEN){
 				fprintf(stderr,"compressed block does not fit in shared buffer (%d)\n",block_len);
 				return -1;
@@ -226,7 +260,9 @@ static int _decompress(FILE *in, FILE *out, int nthreads){
 			memcpy(zlibbuf->source,buf,zlibbuf->sourceLen);
 			zlibbuf->func = zlibutil_auto_inflate;
 			if(j<nthreads-1){
+#ifndef BGZF_ST
 				pthread_create(&threads[j],NULL,(void*(*)(void*))zlibutil_buffer_code,zlibbuf);
+#endif
 			}else{
 				zlibbuf_main_thread=zlibbuf;
 				zlibutil_buffer_code(zlibbuf);
@@ -236,7 +272,9 @@ static int _decompress(FILE *in, FILE *out, int nthreads){
 		for(int j0=0;j0<j;j0++){
 			zlibutil_buffer *zlibbuf;
 			if(j0<nthreads-1){
+#ifndef BGZF_ST
 				pthread_join(threads[j0],(void**)&zlibbuf);
+#endif
 			}else{
 				zlibbuf=zlibbuf_main_thread;
 			}
@@ -266,6 +304,7 @@ int _7migz(const int argc, const char **argv){
 	int cmode=0,mode=0;
 	int zlib=0,sevenzip=0,zopfli=0,miniz=0,slz=0,libdeflate=0,zlibng=0,igzip=0;
 	int nthreads=1;
+	int bsize=512;
 	poptContext optCon;
 	int optc;
 
@@ -283,6 +322,7 @@ int _7migz(const int argc, const char **argv){
 		//{ "threshold",  't',         POPT_ARG_INT, &threshold, 0,       "compression threshold (in %, 10-100)", "threshold" },
 		{ "threads",     '@',         POPT_ARG_INT, &nthreads,    0,       "threads", "threads" },
 		{ "decompress", 'd',         POPT_ARG_NONE,            &mode,      0,       "decompress", NULL },
+		{ "bsize",     'b',         POPT_ARG_INT, &bsize,    0,       "bsize in 1024b unit (512)", "bsize" },
 		POPT_AUTOHELP,
 		POPT_TABLEEND,
 	};
@@ -351,8 +391,13 @@ int _7migz(const int argc, const char **argv){
 	}
 	if(nthreads<1)nthreads=1;
 
+#ifdef NOTIMEOFDAY
+	time_t tstart,tend;
+	time(&tstart);
+#else
 	struct timeval tstart,tend;
 	gettimeofday(&tstart,NULL);
+#endif
 	int ret=0;
 	if(mode){
 		if(isatty(fileno(stdin))||isatty(fileno(stdout)))
@@ -369,36 +414,41 @@ int _7migz(const int argc, const char **argv){
 		fprintf(stderr,"compression level = %d ",level_sum);
 		if(zlib){
 			fprintf(stderr,"(zlib)\n");
-			ret=_compress(stdin,stdout,zlib,DEFLATE_ZLIB,nthreads);
+			ret=_compress(stdin,stdout,zlib,DEFLATE_ZLIB,nthreads,bsize);
 		}else if(sevenzip){
 			fprintf(stderr,"(7zip)\n");
 			if(lzmaOpen7z()){
 				fprintf(stderr,"7-zip is NOT available.\n");
 				return -1;
 			}
-			ret=_compress(stdin,stdout,sevenzip,DEFLATE_7ZIP,nthreads);
+			ret=_compress(stdin,stdout,sevenzip,DEFLATE_7ZIP,nthreads,bsize);
 			lzmaClose7z();
 		}else if(zopfli){
 			fprintf(stderr,"(zopfli)\n");
-			ret=_compress(stdin,stdout,zopfli,DEFLATE_ZOPFLI,nthreads);
+			ret=_compress(stdin,stdout,zopfli,DEFLATE_ZOPFLI,nthreads,bsize);
 		}else if(miniz){
 			fprintf(stderr,"(miniz)\n");
-			ret=_compress(stdin,stdout,miniz,DEFLATE_MINIZ,nthreads);
+			ret=_compress(stdin,stdout,miniz,DEFLATE_MINIZ,nthreads,bsize);
 		}else if(slz){
 			fprintf(stderr,"(slz)\n");
-			ret=_compress(stdin,stdout,slz,DEFLATE_SLZ,nthreads);
+			ret=_compress(stdin,stdout,slz,DEFLATE_SLZ,nthreads,bsize);
 		}else if(libdeflate){
 			fprintf(stderr,"(libdeflate)\n");
-			ret=_compress(stdin,stdout,libdeflate,DEFLATE_LIBDEFLATE,nthreads);
+			ret=_compress(stdin,stdout,libdeflate,DEFLATE_LIBDEFLATE,nthreads,bsize);
 		}else if(zlibng){
 			fprintf(stderr,"(zlibng)\n");
-			ret=_compress(stdin,stdout,zlibng,DEFLATE_ZLIBNG,nthreads);
+			ret=_compress(stdin,stdout,zlibng,DEFLATE_ZLIBNG,nthreads,bsize);
 		}else if(igzip){
 			fprintf(stderr,"(igzip)\n");
-			ret=_compress(stdin,stdout,igzip,DEFLATE_IGZIP,nthreads);
+			ret=_compress(stdin,stdout,igzip,DEFLATE_IGZIP,nthreads,bsize);
 		}
 	}
+#ifdef NOTIMEOFDAY
+	time(&tend);
+	fprintf(stderr,"ellapsed time: %d sec\n",tend-tstart);
+#else
 	gettimeofday(&tend,NULL);
 	fprintf(stderr,"ellapsed time: %.6f sec\n",(tend.tv_sec+tend.tv_usec*0.000001)-(tstart.tv_sec+tstart.tv_usec*0.000001));
+#endif
 	return ret;
 }

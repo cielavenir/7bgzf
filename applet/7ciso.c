@@ -45,8 +45,15 @@ int filelength(int fd){return filelengthi64(fd);}
 #include "../lib/lzma.h"
 #include "../lib/popt/popt.h"
 
+#ifdef NOTIMEOFDAY
+#include <time.h>
+#else
 #include <sys/time.h>
+#endif
+
+#ifndef BGZF_ST
 #include <pthread.h>
+#endif
 
 int copy_block_decode(
 	unsigned char *dest,
@@ -91,7 +98,11 @@ static int _compress(FILE *in, FILE *out, int level, int method, int threshold, 
 
 	const int chkpoint_interval=1024;
 	int chkpoint=chkpoint_interval;
+#ifndef BGZF_ST
 	pthread_t *threads=(pthread_t*)alloca(sizeof(pthread_t)*nthreads);
+#else
+	nthreads=1;
+#endif
 	long long i=0;
 	for(;i<total_block;i+=nthreads){
 		zlibutil_buffer *zlibbuf_main_thread=NULL;
@@ -122,7 +133,9 @@ static int _compress(FILE *in, FILE *out, int level, int method, int threshold, 
 			zlibbuf->encode = 1;
 			zlibbuf->level = level;
 			if(j<nthreads-1){
+#ifndef BGZF_ST
 				pthread_create(&threads[j],NULL,(void*(*)(void*))zlibutil_buffer_code,zlibbuf);
+#endif
 			}else{
 				zlibbuf_main_thread=zlibbuf;
 				zlibutil_buffer_code(zlibbuf);
@@ -132,7 +145,9 @@ static int _compress(FILE *in, FILE *out, int level, int method, int threshold, 
 		for(int j0=0;j0<j;j0++){
 			zlibutil_buffer *zlibbuf;
 			if(j0<nthreads-1){
+#ifndef BGZF_ST
 				pthread_join(threads[j0],(void**)&zlibbuf);
+#endif
 			}else{
 				zlibbuf=zlibbuf_main_thread;
 			}
@@ -190,7 +205,11 @@ static int _decompress(FILE *in, FILE *out, int nthreads){
 
 	const int chkpoint_interval=4096;
 	int chkpoint=chkpoint_interval;
+#ifndef BGZF_ST
 	pthread_t *threads=(pthread_t*)alloca(sizeof(pthread_t)*nthreads);
+#else
+	nthreads = 1;
+#endif
 	for(;i<total_block;i+=nthreads){
 		zlibutil_buffer *zlibbuf_main_thread=NULL;
 		int j=0;
@@ -207,7 +226,9 @@ static int _decompress(FILE *in, FILE *out, int nthreads){
 				fread(zlibbuf->source,1,size,in);counter+=size;
 				zlibbuf->func = copy_block_decode;
 				if(j<nthreads-1){
+#ifndef BGZF_ST
 					pthread_create(&threads[j],NULL,(void*(*)(void*))zlibutil_buffer_code,zlibbuf);
+#endif
 				}else{
 					zlibbuf_main_thread=zlibbuf;
 					zlibutil_buffer_code(zlibbuf);
@@ -217,7 +238,9 @@ static int _decompress(FILE *in, FILE *out, int nthreads){
 				fread(zlibbuf->source,1,size,in);counter+=size;
 				zlibbuf->func = zlibutil_auto_inflate;
 				if(j<nthreads-1){
+#ifndef BGZF_ST
 					pthread_create(&threads[j],NULL,(void*(*)(void*))zlibutil_buffer_code,zlibbuf);
+#endif
 				}else{
 					zlibbuf_main_thread=zlibbuf;
 					zlibutil_buffer_code(zlibbuf);
@@ -228,7 +251,9 @@ static int _decompress(FILE *in, FILE *out, int nthreads){
 		for(int j0=0;j0<j;j0++){
 			zlibutil_buffer *zlibbuf;
 			if(j0<nthreads-1){
+#ifndef BGZF_ST
 				pthread_join(threads[j0],(void**)&zlibbuf);
+#endif
 			}else{
 				zlibbuf=zlibbuf_main_thread;
 			}
@@ -343,8 +368,13 @@ int _7ciso(const int argc, const char **argv){
 	}
 	if(nthreads<1)nthreads=1;
 
+#ifdef NOTIMEOFDAY
+	time_t tstart,tend;
+	time(&tstart);
+#else
 	struct timeval tstart,tend;
 	gettimeofday(&tstart,NULL);
+#endif
 	int ret=0;
 	if(mode){
 		if(isatty(fileno(stdin))||isatty(fileno(stdout)))
@@ -400,7 +430,12 @@ int _7ciso(const int argc, const char **argv){
 		}
 		fclose(in),fclose(out);
 	}
+#ifdef NOTIMEOFDAY
+	time(&tend);
+	fprintf(stderr,"ellapsed time: %d sec\n",tend-tstart);
+#else
 	gettimeofday(&tend,NULL);
 	fprintf(stderr,"ellapsed time: %.6f sec\n",(tend.tv_sec+tend.tv_usec*0.000001)-(tstart.tv_sec+tstart.tv_usec*0.000001));
+#endif
 	return ret;
 }

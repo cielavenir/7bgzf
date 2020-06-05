@@ -54,8 +54,15 @@ void *_memmem(const void *s1, size_t siz1, const void *s2, size_t siz2);
 #include "../lib/lzma.h"
 #include "../lib/popt/popt.h"
 
+#ifdef NOTIMEOFDAY
+#include <time.h>
+#else
 #include <sys/time.h>
+#endif
+
+#ifndef BGZF_ST
 #include <pthread.h>
+#endif
 
 #define GZINGA_HEADER "\x1f\x8b\x08\x10\x00\x00\x00\x00\x00"
 #define GZINGA_HEADER_LEN 9
@@ -68,8 +75,8 @@ void *_memmem(const void *s1, size_t siz1, const void *s2, size_t siz2);
 #define COMMENT      0x10 /* bit 4 set: file comment present */
 #define RESERVED     0xE0 /* bits 5..7: reserved */
 
-static int _read_gz_header(unsigned char *data, int size, int *extra_off, int *extra_len, int *block_len){
-	int method, flags, n;
+static int _read_gz_header(unsigned char *data, int size, int *extra_off, int *extra_len){
+	int method, flags, n, len;
 	if(size < 2) return 0;
 	if(data[0] != 0x1f || data[1] != 0x8b) return 0;
 	if(size < 4) return 0;
@@ -79,7 +86,15 @@ static int _read_gz_header(unsigned char *data, int size, int *extra_off, int *e
 	n = 4 + 6; // Skip 6 bytes
 	*extra_off = n + 2;
 	*extra_len = 0;
-	//if(flags & EXTRA_FIELD);
+	if(flags & EXTRA_FIELD){
+		if(size < n + 2) return 0;
+		len = read16(data+n);
+		n += 2;
+		*extra_off = n;
+		*extra_len = len;
+		if(size < n + len) return 0;
+		n += len;
+	}
 	if(flags & ORIG_NAME) while(n < size && data[n++]);
 	if(flags & COMMENT) while(n < size && data[n++]);
 	if(flags & HEAD_CRC){
@@ -97,7 +112,11 @@ static int _compress(FILE *in, FILE *out, int level, int method, int nthreads){
 	int i=0;
 	const int chkpoint_interval=64;
 	int chkpoint=chkpoint_interval;
+#ifndef BGZF_ST
 	pthread_t *threads=(pthread_t*)alloca(sizeof(pthread_t)*nthreads);
+#else
+	nthreads=1;
+#endif
 
 	long long total_size=0;
 	int total_block=0;
@@ -130,7 +149,9 @@ static int _compress(FILE *in, FILE *out, int level, int method, int nthreads){
 			zlibbuf->encode = 1;
 			zlibbuf->level = level;
 			if(j<nthreads-1){
+#ifndef BGZF_ST
 				pthread_create(&threads[j],NULL,(void*(*)(void*))zlibutil_buffer_code,zlibbuf);
+#endif
 			}else{
 				zlibbuf_main_thread=zlibbuf;
 				zlibutil_buffer_code(zlibbuf);
@@ -140,7 +161,9 @@ static int _compress(FILE *in, FILE *out, int level, int method, int nthreads){
 		for(int j0=0;j0<j;j0++){
 			zlibutil_buffer *zlibbuf;
 			if(j0<nthreads-1){
+#ifndef BGZF_ST
 				pthread_join(threads[j0],(void**)&zlibbuf);
+#endif
 			}else{
 				zlibbuf=zlibbuf_main_thread;
 			}
@@ -197,7 +220,11 @@ static int _decompress(FILE *in, FILE *out, int nthreads){
 
 	const int chkpoint_interval=256;
 	int chkpoint=chkpoint_interval;
+#ifndef BGZF_ST
 	pthread_t *threads=(pthread_t*)alloca(sizeof(pthread_t)*nthreads);
+#else
+	nthreads=1;
+#endif
 
 	int FOOTER_READ_SIZE=32*1024;
 	fseeko(in,0,SEEK_END);
@@ -221,7 +248,6 @@ static int _decompress(FILE *in, FILE *out, int nthreads){
 	// head+10 has offsets list; parse them
 	int LSTOFFSET=BUFLEN*3/4;
 	head+=10;
-	fprintf(stderr,"%s\n",head);
 	long long *lstbegin=(long long*)(buf+LSTOFFSET);
 	int total_block=0;
 	lstbegin[total_block]=0;
@@ -252,8 +278,8 @@ static int _decompress(FILE *in, FILE *out, int nthreads){
 				fprintf(stderr,"file truncated\n");
 				return -1;		
 			}
-			int extra_off, extra_len, block_len;
-			int n=_read_gz_header(buf,readlen,&extra_off,&extra_len,&block_len);
+			int extra_off, extra_len;
+			int n=_read_gz_header(buf,readlen,&extra_off,&extra_len);
 			if(!n){
 				fprintf(stderr,"corrupted\n");
 				return -1;
@@ -263,7 +289,9 @@ static int _decompress(FILE *in, FILE *out, int nthreads){
 			memcpy(zlibbuf->source,buf+n,zlibbuf->sourceLen);
 			zlibbuf->func = zlibutil_auto_inflate;
 			if(j<nthreads-1){
+#ifndef BGZF_ST
 				pthread_create(&threads[j],NULL,(void*(*)(void*))zlibutil_buffer_code,zlibbuf);
+#endif
 			}else{
 				zlibbuf_main_thread=zlibbuf;
 				zlibutil_buffer_code(zlibbuf);
@@ -273,7 +301,9 @@ static int _decompress(FILE *in, FILE *out, int nthreads){
 		for(int j0=0;j0<j;j0++){
 			zlibutil_buffer *zlibbuf;
 			if(j0<nthreads-1){
+#ifndef BGZF_ST
 				pthread_join(threads[j0],(void**)&zlibbuf);
+#endif
 			}else{
 				zlibbuf=zlibbuf_main_thread;
 			}
@@ -388,8 +418,13 @@ int _7gzinga(const int argc, const char **argv){
 	}
 	if(nthreads<1)nthreads=1;
 
+#ifdef NOTIMEOFDAY
+	time_t tstart,tend;
+	time(&tstart);
+#else
 	struct timeval tstart,tend;
 	gettimeofday(&tstart,NULL);
+#endif
 	int ret=0;
 	if(mode){
 		const char *fname=poptGetArg(optCon);
@@ -440,7 +475,12 @@ int _7gzinga(const int argc, const char **argv){
 			ret=_compress(stdin,stdout,igzip,DEFLATE_IGZIP,nthreads);
 		}
 	}
+#ifdef NOTIMEOFDAY
+	time(&tend);
+	fprintf(stderr,"ellapsed time: %d sec\n",tend-tstart);
+#else
 	gettimeofday(&tend,NULL);
 	fprintf(stderr,"ellapsed time: %.6f sec\n",(tend.tv_sec+tend.tv_usec*0.000001)-(tstart.tv_sec+tstart.tv_usec*0.000001));
+#endif
 	return ret;
 }
