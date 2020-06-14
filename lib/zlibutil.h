@@ -8,6 +8,8 @@ extern "C"{
 #include <stdio.h>
 #include "zlib/zlib.h"
 
+int read_gz_header_generic(unsigned char *data, int size, int *extra_off, int *extra_len);
+
 enum{
 	DEFLATE_ZLIB = 0,
 	DEFLATE_7ZIP,
@@ -17,6 +19,7 @@ enum{
 	DEFLATE_LIBDEFLATE,
 	DEFLATE_ZLIBNG,
 	DEFLATE_IGZIP,
+	DEFLATE_CRYPTOPP,
 };
 
 typedef struct{
@@ -151,6 +154,21 @@ int igzip_deflate(
 );
 
 int igzip_inflate(
+	unsigned char *dest,
+	size_t *destLen,
+	const unsigned char *source,
+	size_t sourceLen
+);
+
+int cryptopp_deflate(
+	unsigned char *dest,
+	size_t *destLen,
+	const unsigned char *source,
+	size_t sourceLen,
+	int level
+);
+
+int cryptopp_inflate(
 	unsigned char *dest,
 	size_t *destLen,
 	const unsigned char *source,

@@ -1,7 +1,7 @@
 #include "isa-l/include/igzip_lib.h"
 #include <stdlib.h> // malloc/free
 
-int level_size_buf[10] = {
+int igzip_level_size_buf[10] = {
 #ifdef ISAL_DEF_LVL0_DEFAULT
 	ISAL_DEF_LVL0_DEFAULT,
 #else
@@ -74,7 +74,7 @@ int igzip_deflate(
 	z.flush = FULL_FLUSH;
 	z.gzip_flag = 0;
 	z.level = level-1;
-	z.level_buf_size = level_size_buf[z.level];
+	z.level_buf_size = igzip_level_size_buf[z.level];
 	z.level_buf = malloc(z.level_buf_size);
 	z.end_of_stream = 1;
 

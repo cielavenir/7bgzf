@@ -10,6 +10,43 @@
 #include "lzma.h"
 //#include "zlib-ng/zlib-ng.h"
 
+// gzip flag byte
+#define ASCII_FLAG   0x01 /* bit 0 set: file probably ascii text */
+#define HEAD_CRC     0x02 /* bit 1 set: header CRC present */
+#define EXTRA_FIELD  0x04 /* bit 2 set: extra field present */
+#define ORIG_NAME    0x08 /* bit 3 set: original file name present */
+#define COMMENT      0x10 /* bit 4 set: file comment present */
+#define RESERVED     0xE0 /* bits 5..7: reserved */
+
+int read_gz_header_generic(unsigned char *data, int size, int *extra_off, int *extra_len){
+	int method, flags, n, len;
+	if(size < 2) return 0;
+	if(data[0] != 0x1f || data[1] != 0x8b) return 0;
+	if(size < 4) return 0;
+	method = data[2];
+	flags  = data[3];
+	if(method != Z_DEFLATED || (flags & RESERVED)) return 0;
+	n = 4 + 6; // Skip 6 bytes
+	*extra_off = n + 2;
+	*extra_len = 0;
+	if(flags & EXTRA_FIELD){
+		if(size < n + 2) return 0;
+		len = data[n]|(data[n+1]<<8);
+		n += 2;
+		*extra_off = n;
+		*extra_len = len;
+		if(size < n + len) return 0;
+		n += len;
+	}
+	if(flags & ORIG_NAME) while(n < size && data[n++]);
+	if(flags & COMMENT) while(n < size && data[n++]);
+	if(flags & HEAD_CRC){
+		if(n + 2 > size) return 0;
+		n += 2;
+	}
+	return n;
+}
+
 static inline void write32be(void *p, const unsigned int n){
 	unsigned char *x=(unsigned char*)p;
 	x[3]=n&0xff,x[2]=(n>>8)&0xff,x[1]=(n>>16)&0xff,x[0]=(n>>24)&0xff;

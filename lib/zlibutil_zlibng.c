@@ -8,7 +8,7 @@ int zlibng_deflate(
 	size_t sourceLen,
 	int level
 ){
-#ifdef FEOS
+#if defined(NOZLIBNG)
 	return -1;
 #else
 	zng_stream z;
@@ -45,7 +45,7 @@ int zlibng_inflate(
 	const unsigned char *source,
 	size_t sourceLen
 ){
-#ifdef FEOS
+#if defined(NOZLIBNG)
 	return -1;
 #else
 	zng_stream z;
