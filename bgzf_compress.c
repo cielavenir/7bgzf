@@ -33,7 +33,10 @@ __attribute__((destructor)) void finish(){
         if(loaded7z)lzmaClose7z();
 }
 
-int bgzf_compress(void *_dst, size_t *_dlen, const void *src, size_t slen, int level){
+static int method=-1;
+static int level=-1;
+
+int bgzf_compress(void *_dst, size_t *_dlen, const void *src, size_t slen, int level_unused){
 	if(!slen){
 		if(*_dlen<28)return -1;
 		*_dlen=28;
@@ -47,59 +50,65 @@ int bgzf_compress(void *_dst, size_t *_dlen, const void *src, size_t slen, int l
 		return 0;
 	}
 
-	int method=DEFLATE_ZLIB;
-	const char* _smethod=getenv("BGZF_METHOD");
-	if(_smethod&&*_smethod){
-		char *smethod=alloca(strlen(_smethod)+1);
-		strcpy(smethod,_smethod);
-		//fputs(smethod,stderr);fputs("\n",stderr);
-		//set level
-		int _level=-1;
-		int l=strlen(smethod);
-		int i=l-1;
-		for(;i>=0 && '0'<=smethod[i]&&smethod[i]<='9';i--){
-			if(_level<0)_level=0;
-			_level*=10;
-			_level+=smethod[i]-'0';
+	if(method==-1){
+		method=DEFLATE_ZLIB;
+		const char* _smethod=getenv("BGZF_METHOD");
+		if(_smethod&&*_smethod){
+			char *smethod=alloca(strlen(_smethod)+1);
+			strcpy(smethod,_smethod);
+			//fputs(smethod,stderr);fputs("\n",stderr);
+			//set level
+			int _level=-1;
+			int l=strlen(smethod);
+			int i=l-1;
+			for(;i>=0 && '0'<=smethod[i]&&smethod[i]<='9';i--){
+				if(_level<0)_level=0;
+				_level*=10;
+				_level+=smethod[i]-'0';
+			}
+			if(_level>=0)level=_level;
+			//set method
+			smethod[i+1]=0;
+			if(!strcasecmp(smethod,"zlib")){
+				method=DEFLATE_ZLIB;
+			}
+			if(!strcasecmp(smethod,"7zip") || !strcasecmp(smethod,"7-zip")){
+				method=DEFLATE_7ZIP;
+			}
+			if(!strcasecmp(smethod,"zopfli")){
+				method=DEFLATE_ZOPFLI;
+			}
+			if(!strcasecmp(smethod,"miniz")){
+				method=DEFLATE_MINIZ;
+			}
+			if(!strcasecmp(smethod,"slz") || !strcasecmp(smethod,"libslz")){
+				method=DEFLATE_SLZ;
+			}
+			if(!strcasecmp(smethod,"libdeflate")){
+				method=DEFLATE_LIBDEFLATE;
+			}
+			if(!strcasecmp(smethod,"zlibng")){
+				method=DEFLATE_ZLIBNG;
+			}
+			if(!strcasecmp(smethod,"igzip")){
+				method=DEFLATE_IGZIP;
+			}
+			if(!strcasecmp(smethod,"cryptopp")){
+				method=DEFLATE_CRYPTOPP;
+			}
 		}
-		if(_level>=0)level=_level;
-		//set method
-		smethod[i+1]=0;
-		if(!strcasecmp(smethod,"zlib")){
-			method=DEFLATE_ZLIB;
-		}
-		if(!strcasecmp(smethod,"7zip") || !strcasecmp(smethod,"7-zip")){
-			method=DEFLATE_7ZIP;
-		}
-		if(!strcasecmp(smethod,"zopfli")){
-			method=DEFLATE_ZOPFLI;
-		}
-		if(!strcasecmp(smethod,"miniz")){
-			method=DEFLATE_MINIZ;
-		}
-		if(!strcasecmp(smethod,"slz") || !strcasecmp(smethod,"libslz")){
-			method=DEFLATE_SLZ;
-		}
-		if(!strcasecmp(smethod,"libdeflate")){
-			method=DEFLATE_LIBDEFLATE;
-		}
-		if(!strcasecmp(smethod,"zlibng")){
-			method=DEFLATE_ZLIBNG;
-		}
-		if(!strcasecmp(smethod,"igzip")){
-			method=DEFLATE_IGZIP;
-		}
-	}
 
-	if(level<0){
-		if(method==DEFLATE_ZLIB)level=6;
-		if(method==DEFLATE_7ZIP)level=2;
-		if(method==DEFLATE_ZOPFLI)level=1;
-		if(method==DEFLATE_MINIZ)level=1;
-		if(method==DEFLATE_SLZ)level=1;
-		if(method==DEFLATE_LIBDEFLATE)level=6;
-		if(method==DEFLATE_ZLIBNG)level=6;
-		if(method==DEFLATE_IGZIP)level=1;
+		if(level<0){
+			if(method==DEFLATE_ZLIB)level=6;
+			if(method==DEFLATE_7ZIP)level=2;
+			if(method==DEFLATE_ZOPFLI)level=1;
+			if(method==DEFLATE_MINIZ)level=1;
+			if(method==DEFLATE_SLZ)level=1;
+			if(method==DEFLATE_LIBDEFLATE)level=6;
+			if(method==DEFLATE_ZLIBNG)level=6;
+			if(method==DEFLATE_IGZIP)level=1;
+			if(method==DEFLATE_CRYPTOPP)level=6;
+		}
 	}
 
 	//compress
@@ -168,6 +177,13 @@ int bgzf_compress(void *_dst, size_t *_dlen, const void *src, size_t slen, int l
 		int r=igzip_deflate(dst,&dlen,(const unsigned char*)src,slen,level);
 		if(r){
 			fprintf(stderr,"isal_deflate %d\n",r);
+			return 1;
+		}
+	}
+	if(method==DEFLATE_CRYPTOPP){
+		int r=cryptopp_deflate(dst,&dlen,(const unsigned char*)src,slen,level);
+		if(r){
+			fprintf(stderr,"cryptopp_deflate %d\n",r);
 			return 1;
 		}
 	}
