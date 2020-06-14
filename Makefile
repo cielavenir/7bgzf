@@ -4,7 +4,7 @@ ifneq ($(BUILD),$(notdir $(CURDIR)))
 
 TARGET ?= cielbox
 
-SOURCES		+= applet applet_stl applet/hash lib lib/cryptonite lib/libmshlsplash lib/zlib lib/zopfli lib/libdeflate lib/lz4 lib/zstd lib/libbzip2 lib/popt .
+SOURCES		+= applet lib lib/zlib lib/zopfli lib/libdeflate lib/popt .
 INCLUDES	+= 
 DATA		+= data 
 
