@@ -67,43 +67,6 @@ void *_memmem(const void *s1, size_t siz1, const void *s2, size_t siz2);
 #define GZINGA_HEADER "\x1f\x8b\x08\x10\x00\x00\x00\x00\x00"
 #define GZINGA_HEADER_LEN 9
 
-// gzip flag byte
-#define ASCII_FLAG   0x01 /* bit 0 set: file probably ascii text */
-#define HEAD_CRC     0x02 /* bit 1 set: header CRC present */
-#define EXTRA_FIELD  0x04 /* bit 2 set: extra field present */
-#define ORIG_NAME    0x08 /* bit 3 set: original file name present */
-#define COMMENT      0x10 /* bit 4 set: file comment present */
-#define RESERVED     0xE0 /* bits 5..7: reserved */
-
-static int _read_gz_header(unsigned char *data, int size, int *extra_off, int *extra_len){
-	int method, flags, n, len;
-	if(size < 2) return 0;
-	if(data[0] != 0x1f || data[1] != 0x8b) return 0;
-	if(size < 4) return 0;
-	method = data[2];
-	flags  = data[3];
-	if(method != Z_DEFLATED || (flags & RESERVED)) return 0;
-	n = 4 + 6; // Skip 6 bytes
-	*extra_off = n + 2;
-	*extra_len = 0;
-	if(flags & EXTRA_FIELD){
-		if(size < n + 2) return 0;
-		len = read16(data+n);
-		n += 2;
-		*extra_off = n;
-		*extra_len = len;
-		if(size < n + len) return 0;
-		n += len;
-	}
-	if(flags & ORIG_NAME) while(n < size && data[n++]);
-	if(flags & COMMENT) while(n < size && data[n++]);
-	if(flags & HEAD_CRC){
-		if(n + 2 > size) return 0;
-		n += 2;
-	}
-	return n;
-}
-
 static int _compress(FILE *in, FILE *out, int level, int method, int nthreads){
 	const int block_size=100*1024;
 
@@ -145,6 +108,8 @@ static int _compress(FILE *in, FILE *out, int level, int method, int nthreads){
 				zlibbuf->func = zlibng_deflate;
 			}else if(method==DEFLATE_IGZIP){
 				zlibbuf->func = igzip_deflate;
+			}else if(method==DEFLATE_CRYPTOPP){
+				zlibbuf->func = cryptopp_deflate;
 			}
 			zlibbuf->encode = 1;
 			zlibbuf->level = level;
@@ -184,6 +149,8 @@ static int _compress(FILE *in, FILE *out, int level, int method, int nthreads){
 					fprintf(stderr,"zng_deflate %d\n",zlibbuf->ret);
 				}else if(method==DEFLATE_IGZIP){
 					fprintf(stderr,"isal_deflate %d\n",zlibbuf->ret);
+				}else if(method==DEFLATE_CRYPTOPP){
+					fprintf(stderr,"CryptoPP::Deflator::Put %d\n",zlibbuf->ret);
 				}
 				zlibutil_buffer_free(zlibbuf);
 				return 1;
@@ -279,7 +246,7 @@ static int _decompress(FILE *in, FILE *out, int nthreads){
 				return -1;		
 			}
 			int extra_off, extra_len;
-			int n=_read_gz_header(buf,readlen,&extra_off,&extra_len);
+			int n=read_gz_header_generic(buf,readlen,&extra_off,&extra_len);
 			if(!n){
 				fprintf(stderr,"corrupted\n");
 				return -1;
@@ -331,7 +298,7 @@ int main(const int argc, const char **argv){
 int _7gzinga(const int argc, const char **argv){
 #endif
 	int cmode=0,mode=0;
-	int zlib=0,sevenzip=0,zopfli=0,miniz=0,slz=0,libdeflate=0,zlibng=0,igzip=0;
+	int zlib=0,sevenzip=0,zopfli=0,miniz=0,slz=0,libdeflate=0,zlibng=0,igzip=0,cryptopp=0;
 	int nthreads=1;
 	poptContext optCon;
 	int optc;
@@ -345,6 +312,7 @@ int _7gzinga(const int argc, const char **argv){
 		{ "libdeflate",     'l',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,    'l',       "1-12 (default 6) libdeflate", "level" },
 		{ "7zip",     'S',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,    'S',       "1-9 (default 2) 7zip", "level" },
 		{ "zlibng",     'n',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,    'n',       "1-9 (default 6) zlibng", "level" },
+		{ "cryptopp",     'C',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,    'C',       "1-9 (default 6) cryptopp", "level" },
 		{ "igzip",     'i',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,    'i',       "1-4 (default 1) igzip (1 becomes igzip internal level 0, 2 becomes 1, ...)", "level" },
 		{ "zopfli",     'Z',         POPT_ARG_INT, &zopfli,    0,       "zopfli", "numiterations" },
 		//{ "threshold",  't',         POPT_ARG_INT, &threshold, 0,       "compression threshold (in %, 10-100)", "threshold" },
@@ -394,6 +362,12 @@ int _7gzinga(const int argc, const char **argv){
 				else zlibng=6;
 				break;
 			}
+			case 'C':{
+				char *arg=poptGetOptArg(optCon);
+				if(arg)cryptopp=strtol(arg,NULL,10),free(arg);
+				else cryptopp=6;
+				break;
+			}
 			case 'i':{
 				char *arg=poptGetOptArg(optCon);
 				if(arg)igzip=strtol(arg,NULL,10),free(arg);
@@ -403,12 +377,12 @@ int _7gzinga(const int argc, const char **argv){
 		}
 	}
 
-	int level_sum=zlib+sevenzip+zopfli+miniz+slz+libdeflate+zlibng+igzip;
+	int level_sum=zlib+sevenzip+zopfli+miniz+slz+libdeflate+zlibng+igzip+cryptopp;
 	if(
 		optc<-1 ||
-		(!mode&&!zlib&&!sevenzip&&!zopfli&&!miniz&&!slz&&!libdeflate&&!zlibng&&!igzip) ||
-		(mode&&(zlib||sevenzip||zopfli||miniz||slz||libdeflate||zlibng||igzip)) ||
-		(!mode&&(level_sum==zlib)+(level_sum==sevenzip)+(level_sum==zopfli)+(level_sum==miniz)+(level_sum==slz)+(level_sum==libdeflate)+(level_sum==zlibng)+(level_sum==igzip)!=1)
+		(!mode&&!zlib&&!sevenzip&&!zopfli&&!miniz&&!slz&&!libdeflate&&!zlibng&&!igzip&&!cryptopp) ||
+		(mode&&(zlib||sevenzip||zopfli||miniz||slz||libdeflate||zlibng||igzip||cryptopp)) ||
+		(!mode&&(level_sum==zlib)+(level_sum==sevenzip)+(level_sum==zopfli)+(level_sum==miniz)+(level_sum==slz)+(level_sum==libdeflate)+(level_sum==zlibng)+(level_sum==igzip)+(level_sum==cryptopp)!=1)
 	){
 		poptPrintHelp(optCon, stderr, 0);
 		poptFreeContext(optCon);
@@ -473,6 +447,9 @@ int _7gzinga(const int argc, const char **argv){
 		}else if(igzip){
 			fprintf(stderr,"(igzip)\n");
 			ret=_compress(stdin,stdout,igzip,DEFLATE_IGZIP,nthreads);
+		}else if(cryptopp){
+			fprintf(stderr,"(cryptopp)\n");
+			ret=_compress(stdin,stdout,cryptopp,DEFLATE_CRYPTOPP,nthreads);
 		}
 	}
 #ifdef NOTIMEOFDAY

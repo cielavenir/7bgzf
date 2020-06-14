@@ -223,6 +223,8 @@ for(;;){
 				zlibbuf->func = zlibng_deflate;
 			}else if(method==DEFLATE_IGZIP){
 				zlibbuf->func = igzip_deflate;
+			}else if(method==DEFLATE_CRYPTOPP){
+				zlibbuf->func = cryptopp_deflate;
 			}
 			zlibbuf->encode = 1;
 			zlibbuf->level = level;
@@ -270,6 +272,8 @@ for(;;){
 					fprintf(stderr,"zng_deflate %d\n",zlibbuf->ret);
 				}else if(method==DEFLATE_IGZIP){
 					fprintf(stderr,"isal_deflate %d\n",zlibbuf->ret);
+				}else if(method==DEFLATE_CRYPTOPP){
+					fprintf(stderr,"CryptoPP::Deflator::Put %d\n",zlibbuf->ret);
 				}
 				zlibutil_buffer_free(zlibbuf);
 				return 1;
@@ -304,7 +308,7 @@ for(;;){
 	//fprintf(stderr,"%lld %lld\n",filepos,filelengthi64(fileno(in)));
 	if(filepos>=filelengthi64(fileno(in)))break;
 	fread(buf,1,65536+280,in);
-	int offset,len,block_size,total_block;
+	int offset,len,block_size=0,total_block=0;
 	int n=_read_gz_header(buf,65536+280,&offset,&len,&block_size,&total_block);
 	if(!n){fprintf(stderr,"header is not gzip (possibly corrupted)\n");return 1;}
 	memmove(buf,buf+offset+10,2*total_block);
@@ -386,7 +390,7 @@ int main(const int argc, const char **argv){
 int _7dictzip(const int argc, const char **argv){
 #endif
 	int cmode=0,mode=0,blk_extreme=0;
-	int zlib=0,sevenzip=0,zopfli=0,miniz=0,slz=0,libdeflate=0,zlibng=0,igzip=0;
+	int zlib=0,sevenzip=0,zopfli=0,miniz=0,slz=0,libdeflate=0,zlibng=0,igzip=0,cryptopp=0;
 	int nthreads=1;
 	poptContext optCon;
 	int optc;
@@ -400,6 +404,7 @@ int _7dictzip(const int argc, const char **argv){
 		{ "libdeflate",     'l',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,    'l',       "1-12 (default 6) libdeflate", "level" },
 		{ "7zip",     'S',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,    'S',       "1-9 (default 2) 7zip", "level" },
 		{ "zlibng",     'n',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,    'n',       "1-9 (default 6) zlibng", "level" },
+		{ "cryptopp",     'C',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,    'C',       "1-9 (default 6) cryptopp", "level" },
 		{ "igzip",     'i',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,    'i',       "1-4 (default 1) igzip (1 becomes igzip internal level 0, 2 becomes 1, ...)", "level" },
 		{ "zopfli",     'Z',         POPT_ARG_INT, &zopfli,    0,       "zopfli", "numiterations" },
 		//{ "threshold",  't',         POPT_ARG_INT, &threshold, 0,       "compression threshold (in %, 10-100)", "threshold" },
@@ -450,6 +455,12 @@ int _7dictzip(const int argc, const char **argv){
 				else zlibng=6;
 				break;
 			}
+			case 'C':{
+				char *arg=poptGetOptArg(optCon);
+				if(arg)cryptopp=strtol(arg,NULL,10),free(arg);
+				else cryptopp=6;
+				break;
+			}
 			case 'i':{
 				char *arg=poptGetOptArg(optCon);
 				if(arg)igzip=strtol(arg,NULL,10),free(arg);
@@ -459,12 +470,12 @@ int _7dictzip(const int argc, const char **argv){
 		}
 	}
 
-	int level_sum=zlib+sevenzip+zopfli+miniz+slz+libdeflate+zlibng+igzip;
+	int level_sum=zlib+sevenzip+zopfli+miniz+slz+libdeflate+zlibng+igzip+cryptopp;
 	if(
 		optc<-1 ||
-		(!mode&&!zlib&&!sevenzip&&!zopfli&&!miniz&&!slz&&!libdeflate&&!zlibng&&!igzip) ||
-		(mode&&(zlib||sevenzip||zopfli||miniz||slz||libdeflate||zlibng||igzip)) ||
-		(!mode&&(level_sum==zlib)+(level_sum==sevenzip)+(level_sum==zopfli)+(level_sum==miniz)+(level_sum==slz)+(level_sum==libdeflate)+(level_sum==zlibng)+(level_sum==igzip)!=1)
+		(!mode&&!zlib&&!sevenzip&&!zopfli&&!miniz&&!slz&&!libdeflate&&!zlibng&&!igzip&&!cryptopp) ||
+		(mode&&(zlib||sevenzip||zopfli||miniz||slz||libdeflate||zlibng||igzip||cryptopp)) ||
+		(!mode&&(level_sum==zlib)+(level_sum==sevenzip)+(level_sum==zopfli)+(level_sum==miniz)+(level_sum==slz)+(level_sum==libdeflate)+(level_sum==zlibng)+(level_sum==igzip)+(level_sum==cryptopp)!=1)
 	){
 		poptPrintHelp(optCon, stderr, 0);
 		poptFreeContext(optCon);
@@ -539,6 +550,9 @@ int _7dictzip(const int argc, const char **argv){
 		}else if(igzip){
 			fprintf(stderr,"(igzip)\n");
 			ret=_compress(in,out,igzip,DEFLATE_IGZIP,nthreads,block_size);
+		}else if(cryptopp){
+			fprintf(stderr,"(cryptopp)\n");
+			ret=_compress(in,out,cryptopp,DEFLATE_CRYPTOPP,nthreads,block_size);
 		}
 		fclose(out);
 		fclose(in);
