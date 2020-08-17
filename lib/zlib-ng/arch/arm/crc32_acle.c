@@ -10,7 +10,7 @@
 # ifdef ZLIB_COMPAT
 #  include <zconf.h>
 # else
-#  include <zconf-ng.h>
+#  include "../../zconf-ng.h"
 # endif
 # ifdef __linux__
 #  include <stddef.h>
