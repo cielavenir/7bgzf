@@ -1,11 +1,19 @@
 #ifndef __COMPAT_H__
 #define __COMPAT_H__
 
+// You should use strcasecmp/ftruncate. On Windows, MinGW automatically translates it into stricmp/chsize.
+// Never use _lrotl/r. use lrotl/r.
+
+// VisualC++ / C++Builder won't be supported.
+
 #ifdef __cplusplus
 extern "C"{
 #endif
 
+//well well... iPodLinux.
+#ifndef NODLOPEN
 #define _FILE_OFFSET_BITS 64
+#endif
 
 typedef unsigned char byte;
 typedef unsigned char  u8;
@@ -55,7 +63,6 @@ typedef long long s64;
 #else
 	#include <unistd.h>
 	#include <sys/stat.h>
-	#include <fcntl.h>
 	int filelength(int fd);
 	long long filelengthi64(int fd);
 	#define initstdio()
@@ -63,10 +70,27 @@ typedef long long s64;
 	#define LLD "lld"
 	#define LLU "llu"
 	#define LLX "llx"
+
+	#include <fcntl.h>
+	#ifndef NODLOPEN //dynamic load
+	#if defined(__linux__) && !defined(_GNU_SOURCE) && !defined(DL_ANDROID)
+		typedef struct{
+			const char *dli_fname;        /* File name of defining object.  */
+			void *dli_fbase;              /* Load address of that object.  */
+			const char *dli_sname;        /* Name of nearest symbol.  */
+			void *dli_saddr;              /* Exact value of nearest symbol.  */
+		} Dl_info;
+		int dladdr(void *addr, Dl_info *info); //to check returned address validity
+		int dlinfo(void *handle, int request, void *info); //GetModuleFileNameA impl
+		#define RTLD_DI_LINKMAP 2
+	#endif
 	#include <dlfcn.h>
 	#define LoadLibraryA(filename) dlopen(filename,RTLD_NOW)
 	#define GetProcAddress dlsym
 	#define FreeLibrary dlclose
+	#define DLADDR_OK
+	int GetModuleFileNameA(void *hModule,char *pFilename,int nSize);
+	#endif
 #endif
 
 int sfilelength(const char *path);

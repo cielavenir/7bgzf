@@ -7,7 +7,10 @@
 
 #include "lzma.h"
 #include <string.h>
+
+#ifndef wchar_t
 #include <wchar.h>
+#endif
 
 #ifdef __cplusplus
 extern "C"{
@@ -857,18 +860,16 @@ int lzmaOpen7z(){
 	h7z=NULL;
 #ifndef NODLOPEN
 #if defined(_WIN32) || (!defined(__GNUC__) && !defined(__clang__))
-	h7z=LoadLibraryA("C:\\Program Files\\7-Zip\\7z.dll");
+	if(!h7z)h7z=LoadLibraryA("C:\\Program Files\\7-Zip\\7z.dll");
 	if(!h7z)h7z=LoadLibraryA("C:\\Program Files (x86)\\7-Zip\\7z.dll");
 	if(!h7z)h7z=LoadLibraryA("7z.dll"); // last resort using PATH
 	if(!h7z)h7z=LoadLibraryA("7z64.dll"); // lol... (for example, could be useful for Wine testing)
 	if(!h7z)h7z=LoadLibraryA("7z32.dll"); // lol...
 #else
-	h7z=LoadLibraryA("/usr/lib/p7zip/7z.so"); //Generic
-	if(!h7z)h7z=LoadLibraryA("/usr/local/lib/p7zip/7z.so");
-	if(!h7z)h7z=LoadLibraryA("/usr/libexec/p7zip/7z.so");
-	if(!h7z)h7z=LoadLibraryA("/home/linuxbrew/.linuxbrew/lib/p7zip/7z.so");
+	if(!h7z)h7z=LoadLibraryA("/usr/local/opt/p7zip/lib/p7zip/7z.so"); //Homebrew
 	if(!h7z)h7z=LoadLibraryA("/opt/local/lib/p7zip/7z.so"); //MacPorts
 	if(!h7z)h7z=LoadLibraryA("/sw/lib/p7zip/7z.so"); //Fink
+	if(!h7z)h7z=LoadLibraryA("/home/linuxbrew/.linuxbrew/lib/p7zip/7z.so");
 	if(!h7z){
 		char *home = getenv("HOME");
 		if(home){
@@ -877,8 +878,11 @@ int lzmaOpen7z(){
 			h7z=LoadLibraryA(buf);
 		}
 	}
+	if(!h7z)h7z=LoadLibraryA("/usr/lib/p7zip/7z.so"); //Generic
+	if(!h7z)h7z=LoadLibraryA("/usr/local/lib/p7zip/7z.so");
+	if(!h7z)h7z=LoadLibraryA("/usr/libexec/p7zip/7z.so");
 	if(!h7z)h7z=LoadLibraryA("7z.so"); // last resort using LD_LIBRARY_PATH
-	if(!h7z)h7z=LoadLibraryA("7z"); // for some cases such as '7z.dylib' (usually installed as 7z.so on all p7zip platforms, though).
+	if(!h7z)h7z=LoadLibraryA("7z.dylib");
 #endif
 #endif
 	if(!h7z)return 1;
@@ -894,20 +898,32 @@ int lzmaOpen7z(){
 	pSetCodecs=(funcSetCodecs)GetProcAddress(h7z,"SetCodecs");
 #endif
 #endif
-	if(!pCreateArchiver||!pCreateCoder||!pSetCodecs){
+	if(!lzma7zAlive()){
 #ifndef NODLOPEN
 		FreeLibrary(h7z);
 #endif
 		h7z=NULL;
 		return 2;
 	}
+
+	if(h7z){
+		//char path[768];
+#if 0
+//defined(DL_ANDROID)
+		//GetModuleFileNameA(pCreateArchiver,path,768);
+#else
+		//GetModuleFileNameA(h7z,path,768);
+#endif
+		//fprintf(stderr,"7-zip implementation: %s\n",path);
+	}
+
 	return 0; //now you can call 7z.so.
 }
 bool lzma7zAlive(){
 	return h7z&&pCreateArchiver&&pCreateCoder&&pSetCodecs;
 }
 int lzmaClose7z(){
-	if(!h7z)return 1;
+	if(!lzma7zAlive())return 1;
 #ifndef NODLOPEN
 	FreeLibrary(h7z);
 #endif
@@ -1231,28 +1247,28 @@ static HRESULT WINAPI SCompressCodecsInfoRar_CreateEncoder(void* _self, u32 inde
 }
 
 int lzmaLoadUnrar(){
+	if(!lzma7zAlive())return E_FAIL;
 	if(!pSetCodecs)return E_FAIL;
 	if(!scoder.refs){
+		scoder.hRar = NULL;
 #ifndef NODLOPEN
 #if defined(_WIN32) || (!defined(__GNUC__) && !defined(__clang__))
 		//Rar codecs are bundled inside 7z.dll.
 #else
-		scoder.hRar=LoadLibraryA("/usr/lib/p7zip/Codecs/Rar.so"); //Generic
-		if(!scoder.hRar)scoder.hRar=LoadLibraryA("/usr/local/lib/p7zip/Codecs/Rar.so");
-		if(!scoder.hRar)scoder.hRar=LoadLibraryA("/usr/libexec/p7zip/Codecs/Rar.so");
-		if(!scoder.hRar)scoder.hRar=LoadLibraryA("/home/linuxbrew/.linuxbrew/lib/p7zip/Codecs/Rar.so");
-		if(!scoder.hRar)scoder.hRar=LoadLibraryA("/opt/local/lib/p7zip/Codecs/Rar.so"); //MacPorts
-		if(!scoder.hRar)scoder.hRar=LoadLibraryA("/sw/lib/p7zip/Codecs/Rar.so"); //Fink
-		if(!scoder.hRar){
-			char *home = getenv("HOME");
-			if(home){
-				char buf[256];
-				sprintf(buf,"%s/.linuxbrew/lib/p7zip/Codecs/Rar.so",home);
-				scoder.hRar=LoadLibraryA(buf);
-			}
+		{
+			char path[768];
+#if 0
+//defined(DL_ANDROID)
+			GetModuleFileNameA(pCreateArchiver,path,768);
+#else
+			GetModuleFileNameA(h7z,path,768);
+#endif
+			int i=strlen(path)-1;
+			for(;i>=0;i--)if(path[i]=='/'||path[i]=='\\')break;
+			i+=1;
+			strcpy(path+i,"Codecs/Rar.so");
+			scoder.hRar=LoadLibraryA(path);
 		}
-		if(!scoder.hRar)h7z=LoadLibraryA("Rar.so"); // last resort using LD_LIBRARY_PATH
-		if(!scoder.hRar)h7z=LoadLibraryA("Rar"); // for some cases such as '7z.dylib' (usually installed as 7z.so on all p7zip platforms, though).
 		if(!scoder.hRar)return E_FAIL;
 		scoder.vt = (ICompressCodecsInfo_vt*)calloc(1,sizeof(ICompressCodecsInfo_vt));
 		scoder.vt->QueryInterface = SCompressCodecsInfoRar_QueryInterface;
@@ -1277,6 +1293,7 @@ int lzmaLoadUnrar(){
 
 int lzmaUnloadUnrar(){
 	if(!scoder.refs)return 1;
+	if(!scoder.hRar){scoder.refs--;return 0;}
 	scoder.vt->Release(&scoder);
 	return 0;
 }

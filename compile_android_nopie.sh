@@ -11,10 +11,10 @@ echo "Android arm"
 ### -march=armv7-a is required to generate Thumb-2 code.
 ### -mfloat-abi=softfp -mfpu=neon is required to enable NEON intrinsics.
 ### (keeping -D__ARM_NEON for noticing compilation error)
-ARCH="-mthumb -march=armv7-a -mfloat-abi=softfp -mfpu=neon -pthread -Dfseeko=fseek -Dftello=ftell -D__ARM_NEON" arch=noarch host_cpu=base_aliases PREFIX=arm-linux-androideabi- LIBS="-lm -ldl -pthread" SUFF=_android_nopie make
+ARCH="-mthumb -march=armv7-a -mfloat-abi=softfp -mfpu=neon -pthread -Dfseeko=fseek -Dftello=ftell -D__ARM_NEON -DDL_ANDROID" arch=noarch host_cpu=base_aliases PREFIX=arm-linux-androideabi- LIBS="-lm -ldl -pthread" SUFF=_android_nopie make
 make clean
 echo "Android x86"
-ZLIBNG_X86=1 ARCH="-pthread -Dfseeko=fseek -Dftello=ftell" arch=noarch host_cpu=base_aliases PREFIX=i686-linux-android- LIBS="-lm -ldl -pthread" SUFF=_android_x86_nopie make
+ZLIBNG_X86=1 ARCH="-pthread -Dfseeko=fseek -Dftello=ftell -DDL_ANDROID" arch=noarch host_cpu=base_aliases PREFIX=i686-linux-android- LIBS="-lm -ldl -pthread" SUFF=_android_x86_nopie make
 make clean
 
 #upx-lzma --best --lzma cielbox_android
