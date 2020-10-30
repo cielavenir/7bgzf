@@ -1,4 +1,6 @@
 ## 7bgzf
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fcielavenir%2F7bgzf.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fcielavenir%2F7bgzf?ref=badge_shield)
+
 - a suite of DEFLATE (RFC 1951) algorithms
 - contact: please use my github profile or the email on the paper (now published!)
 
@@ -18,3 +20,7 @@
 - on-the-fly conversion of compressed files
 
 I have not mentioned explicitly in the paper, but that conversion means [PetaGene](https://www.petagene.com/). They say they provide virtual filesystem via LD_PRELOAD. But I was not able to get evaluation copy - they say no personal evaluation.
+
+
+## License
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fcielavenir%2F7bgzf.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fcielavenir%2F7bgzf?ref=badge_large)
