@@ -16,6 +16,7 @@
 #include "inflate.h"
 #include "inffast.h"
 #include "inflate_p.h"
+#include "functable.h"
 
 /*
    strm provides memory allocation functions in zalloc and zfree, or
@@ -24,8 +25,8 @@
    windowBits is in the range 8..15, and window is a user-supplied
    window and output buffer that is 2**windowBits bytes.
  */
-int ZEXPORT PREFIX(inflateBackInit_)(PREFIX3(stream) *strm, int windowBits, unsigned char *window,
-                              const char *version, int stream_size) {
+int32_t Z_EXPORT PREFIX(inflateBackInit_)(PREFIX3(stream) *strm, int32_t windowBits, uint8_t *window,
+                              const char *version, int32_t stream_size) {
     struct inflate_state *state;
 
     if (version == NULL || version[0] != PREFIX2(VERSION)[0] || stream_size != (int)(sizeof(PREFIX3(stream))))
@@ -50,6 +51,7 @@ int ZEXPORT PREFIX(inflateBackInit_)(PREFIX3(stream) *strm, int windowBits, unsi
     state->window = window;
     state->wnext = 0;
     state->whave = 0;
+    state->chunksize = functable.chunksize();
     return Z_OK;
 }
 
@@ -119,25 +121,25 @@ int ZEXPORT PREFIX(inflateBackInit_)(PREFIX3(stream) *strm, int windowBits, unsi
    in() should return zero on failure.  out() should return non-zero on
    failure.  If either in() or out() fails, than inflateBack() returns a
    Z_BUF_ERROR.  strm->next_in can be checked for NULL to see whether it
-   was in() or out() that caused in the error.  Otherwise,  inflateBack()
+   was in() or out() that caused in the error.  Otherwise, inflateBack()
    returns Z_STREAM_END on success, Z_DATA_ERROR for an deflate format
    error, or Z_MEM_ERROR if it could not allocate memory for the state.
    inflateBack() can also return Z_STREAM_ERROR if the input parameters
    are not correct, i.e. strm is NULL or the state was not initialized.
  */
-int ZEXPORT PREFIX(inflateBack)(PREFIX3(stream) *strm, in_func in, void *in_desc, out_func out, void *out_desc) {
+int32_t Z_EXPORT PREFIX(inflateBack)(PREFIX3(stream) *strm, in_func in, void *in_desc, out_func out, void *out_desc) {
     struct inflate_state *state;
-    const unsigned char *next;  /* next input */
-    unsigned char *put;         /* next output */
-    unsigned have, left;        /* available input and output */
-    uint32_t hold;              /* bit buffer */
-    unsigned bits;              /* bits in bit buffer */
-    unsigned copy;              /* number of stored or match bytes to copy */
-    unsigned char *from;        /* where to copy match bytes from */
-    code here;                  /* current decoding table entry */
-    code last;                  /* parent table entry */
-    unsigned len;               /* length to copy for repeats, bits to drop */
-    int ret;                    /* return code */
+    z_const unsigned char *next; /* next input */
+    unsigned char *put;          /* next output */
+    unsigned have, left;         /* available input and output */
+    uint32_t hold;               /* bit buffer */
+    unsigned bits;               /* bits in bit buffer */
+    unsigned copy;               /* number of stored or match bytes to copy */
+    unsigned char *from;         /* where to copy match bytes from */
+    code here;                   /* current decoding table entry */
+    code last;                   /* parent table entry */
+    unsigned len;                /* length to copy for repeats, bits to drop */
+    int32_t ret;                 /* return code */
     static const uint16_t order[19] = /* permutation of code lengths */
         {16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15};
 
@@ -498,7 +500,7 @@ int ZEXPORT PREFIX(inflateBack)(PREFIX3(stream) *strm, in_func in, void *in_desc
     return ret;
 }
 
-int ZEXPORT PREFIX(inflateBackEnd)(PREFIX3(stream) *strm) {
+int32_t Z_EXPORT PREFIX(inflateBackEnd)(PREFIX3(stream) *strm) {
     if (strm == NULL || strm->state == NULL || strm->zfree == NULL)
         return Z_STREAM_ERROR;
     ZFREE(strm, strm->state);
