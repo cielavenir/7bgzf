@@ -17,7 +17,7 @@
 #if X86_CPU_FEATURES_ENABLED
 
 #define X86_CPU_FEATURE_SSE2		0x00000001
-#define X86_CPU_FEATURE_PCLMULQDQ	0x00000002
+#define X86_CPU_FEATURE_PCLMUL		0x00000002
 #define X86_CPU_FEATURE_AVX		0x00000004
 #define X86_CPU_FEATURE_AVX2		0x00000008
 #define X86_CPU_FEATURE_BMI2		0x00000010
@@ -27,7 +27,7 @@
 
 extern volatile u32 _cpu_features;
 
-extern void setup_cpu_features(void);
+void setup_cpu_features(void);
 
 static inline u32 get_cpu_features(void)
 {

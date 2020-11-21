@@ -27,10 +27,6 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <stdlib.h>
-#include <string.h>
-
-#include "aligned_malloc.h"
 #include "deflate_compress.h"
 #include "deflate_constants.h"
 #include "unaligned.h"
@@ -369,6 +365,9 @@ struct libdeflate_compressor {
 
 	/* The compression level with which this compressor was created.  */
 	unsigned compression_level;
+
+	/* Anything smaller than this we won't bother trying to compress.  */
+	unsigned min_size_to_compress;
 
 	/* Temporary space for Huffman code output  */
 	u32 precode_freqs[DEFLATE_NUM_PRECODE_SYMS];
@@ -1680,7 +1679,7 @@ deflate_write_uncompressed_block(struct deflate_output_bitstream *os,
 
 static void
 deflate_write_uncompressed_blocks(struct deflate_output_bitstream *os,
-				  const u8 *data, u32 data_length,
+				  const u8 *data, size_t data_length,
 				  bool is_final_block)
 {
 	do {
@@ -1857,7 +1856,7 @@ deflate_finish_sequence(struct deflate_sequence *seq, u32 litrunlen)
  * but rather we combine many symbols into a single "observation type".  For
  * literals we only look at the high bits and low bits, and for matches we only
  * look at whether the match is long or not.  The assumption is that for typical
- * "real" data, places that are good block boundaries will tend to be noticable
+ * "real" data, places that are good block boundaries will tend to be noticeable
  * based only on changes in these aggregate frequencies, without looking for
  * subtle differences in individual symbols.  For example, a change from ASCII
  * bytes to non-ASCII bytes, or from few matches (generally less compressible)
@@ -1959,6 +1958,23 @@ should_end_block(struct block_split_stats *stats,
 }
 
 /******************************************************************************/
+
+/*
+ * This is the level 0 "compressor".  It always outputs uncompressed blocks.
+ */
+static size_t
+deflate_compress_none(struct libdeflate_compressor * restrict c,
+		      const u8 * restrict in, size_t in_nbytes,
+		      u8 * restrict out, size_t out_nbytes_avail)
+{
+	struct deflate_output_bitstream os;
+
+	deflate_init_output(&os, out, out_nbytes_avail);
+
+	deflate_write_uncompressed_blocks(&os, in, in_nbytes, true);
+
+	return deflate_flush_output(&os);
+}
 
 /*
  * This is the "greedy" DEFLATE compressor. It always chooses the longest match.
@@ -2669,24 +2685,41 @@ deflate_init_offset_slot_fast(struct libdeflate_compressor *c)
 	}
 }
 
-LIBDEFLATEAPI struct libdeflate_compressor *
+LIBDEFLATEEXPORT struct libdeflate_compressor * LIBDEFLATEAPI
 libdeflate_alloc_compressor(int compression_level)
 {
 	struct libdeflate_compressor *c;
-	size_t size;
+	size_t size = offsetof(struct libdeflate_compressor, p);
+
+	if (compression_level < 0 || compression_level > 12)
+		return NULL;
 
 #if SUPPORT_NEAR_OPTIMAL_PARSING
 	if (compression_level >= 8)
-		size = offsetof(struct libdeflate_compressor, p) + sizeof(c->p.n);
-	else
+		size += sizeof(c->p.n);
+	else if (compression_level >= 1)
+		size += sizeof(c->p.g);
+#else
+	if (compression_level >= 1)
+		size += sizeof(c->p.g);
 #endif
-		size = offsetof(struct libdeflate_compressor, p) + sizeof(c->p.g);
 
-	c = aligned_malloc(MATCHFINDER_ALIGNMENT, size);
+	c = libdeflate_aligned_malloc(MATCHFINDER_MEM_ALIGNMENT, size);
 	if (!c)
 		return NULL;
 
+	c->compression_level = compression_level;
+
+	/*
+	 * The higher the compression level, the more we should bother trying to
+	 * compress very small inputs.
+	 */
+	c->min_size_to_compress = 56 - (compression_level * 4);
+
 	switch (compression_level) {
+	case 0:
+		c->impl = deflate_compress_none;
+		break;
 	case 1:
 		c->impl = deflate_compress_greedy;
 		c->max_search_depth = 2;
@@ -2747,7 +2780,7 @@ libdeflate_alloc_compressor(int compression_level)
 		c->nice_match_length = 80;
 		c->p.n.num_optim_passes = 3;
 		break;
-	case 12:
+	default:
 		c->impl = deflate_compress_near_optimal;
 		c->max_search_depth = 100;
 		c->nice_match_length = 133;
@@ -2759,18 +2792,13 @@ libdeflate_alloc_compressor(int compression_level)
 		c->max_search_depth = 150;
 		c->nice_match_length = 200;
 		break;
-	case 9:
+	default:
 		c->impl = deflate_compress_lazy;
 		c->max_search_depth = 200;
 		c->nice_match_length = DEFLATE_MAX_MATCH_LEN;
 		break;
 #endif
-	default:
-		aligned_free(c);
-		return NULL;
 	}
-
-	c->compression_level = compression_level;
 
 	deflate_init_offset_slot_fast(c);
 	deflate_init_static_codes(c);
@@ -2778,7 +2806,7 @@ libdeflate_alloc_compressor(int compression_level)
 	return c;
 }
 
-LIBDEFLATEAPI size_t
+LIBDEFLATEEXPORT size_t LIBDEFLATEAPI
 libdeflate_deflate_compress(struct libdeflate_compressor *c,
 			    const void *in, size_t in_nbytes,
 			    void *out, size_t out_nbytes_avail)
@@ -2787,7 +2815,7 @@ libdeflate_deflate_compress(struct libdeflate_compressor *c,
 		return 0;
 
 	/* For extremely small inputs just use a single uncompressed block. */
-	if (unlikely(in_nbytes < 16)) {
+	if (unlikely(in_nbytes < c->min_size_to_compress)) {
 		struct deflate_output_bitstream os;
 		deflate_init_output(&os, out, out_nbytes_avail);
 		if (in_nbytes == 0)
@@ -2799,10 +2827,10 @@ libdeflate_deflate_compress(struct libdeflate_compressor *c,
 	return (*c->impl)(c, in, in_nbytes, out, out_nbytes_avail);
 }
 
-LIBDEFLATEAPI void
+LIBDEFLATEEXPORT void LIBDEFLATEAPI
 libdeflate_free_compressor(struct libdeflate_compressor *c)
 {
-	aligned_free(c);
+	libdeflate_aligned_free(c);
 }
 
 unsigned int
@@ -2811,7 +2839,7 @@ deflate_get_compression_level(struct libdeflate_compressor *c)
 	return c->compression_level;
 }
 
-LIBDEFLATEAPI size_t
+LIBDEFLATEEXPORT size_t LIBDEFLATEAPI
 libdeflate_deflate_compress_bound(struct libdeflate_compressor *c,
 				  size_t in_nbytes)
 {
