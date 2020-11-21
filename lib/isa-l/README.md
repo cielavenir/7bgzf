@@ -2,6 +2,7 @@ Intel(R) Intelligent Storage Acceleration Library
 =================================================
 
 [![Build Status](https://travis-ci.org/intel/isa-l.svg?branch=master)](https://travis-ci.org/intel/isa-l)
+[![Package on conda-forge](https://img.shields.io/conda/v/conda-forge/isa-l.svg)](https://anaconda.org/conda-forge/isa-l)
 
 ISA-L is a collection of optimized low-level functions targeting storage
 applications.  ISA-L includes:
@@ -20,7 +21,7 @@ Also see:
 * For crypto functions see [isa-l_crypto on github](https://github.com/intel/isa-l_crypto).
 * The [github wiki](https://github.com/intel/isa-l/wiki) including a list of
   [distros/ports](https://github.com/intel/isa-l/wiki/Ports--Repos) offering binary packages.
-* ISA-L [mailing list](https://lists.01.org/mailman/listinfo/isal).
+* ISA-L [mailing list](https://lists.01.org/hyperkitty/list/isal@lists.01.org/).
 * [Contributing](CONTRIBUTING.md).
 
 Building ISA-L
@@ -28,11 +29,20 @@ Building ISA-L
 
 ### Prerequisites
 
+* Make: GNU 'make' or 'nmake' (Windows).
+* Optional: Building with autotools requires autoconf/automake packages.
+
+x86_64:
 * Assembler: nasm v2.11.01 or later (nasm v2.13 or better suggested for building in AVX512 support)
   or yasm version 1.2.0 or later.
 * Compiler: gcc, clang, icc or VC compiler.
-* Make: GNU 'make' or 'nmake' (Windows).
-* Optional: Building with autotools requires autoconf/automake packages.
+
+aarch64:
+* Assembler: gas v2.24 or later.
+* Compiler: gcc v4.7 or later.
+
+other:
+* Compiler: Portable base functions are available that build with most C compilers.
 
 ### Autotools
 To build and install the library with autotools it is usually sufficient to run:
@@ -51,6 +61,8 @@ To use a standard makefile run:
 On Windows use nmake to build dll and static lib:
 
     nmake -f Makefile.nmake
+
+or see [details on setting up environment here](doc/build.md).
 
 ### Other make targets
 Other targets include:

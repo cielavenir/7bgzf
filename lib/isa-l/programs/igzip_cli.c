@@ -224,7 +224,7 @@ size_t get_filesize(FILE * fp)
 	fseeko(fp, 0, SEEK_END);
 #endif
 	fgetpos(fp, &pos);
-	file_size = *(size_t *) & pos;
+	file_size = *(size_t *)&pos;
 	fsetpos(fp, &pos_curr);	/* Restore position */
 
 	return file_size;
@@ -583,8 +583,9 @@ int compress_file(void)
 	struct isal_gzip_header gz_hdr;
 	int ret, success = 0;
 
-	char *infile_name = global_options.infile_name, *outfile_name =
-	    global_options.outfile_name;
+	char *infile_name = global_options.infile_name;
+	char *outfile_name = global_options.outfile_name;
+	char *allocated_name = NULL;
 	char *suffix = global_options.suffix;
 	size_t infile_name_len = global_options.infile_name_len;
 	size_t outfile_name_len = global_options.outfile_name_len;
@@ -598,6 +599,7 @@ int compress_file(void)
 	}
 
 	if (infile_name_len == stdin_file_name_len &&
+	    infile_name != NULL &&
 	    memcmp(infile_name, stdin_file_name, infile_name_len) == 0) {
 		infile_name = NULL;
 		infile_name_len = 0;
@@ -605,9 +607,10 @@ int compress_file(void)
 
 	if (outfile_name == NULL && infile_name != NULL && !global_options.use_stdout) {
 		outfile_name_len = infile_name_len + suffix_len;
-		outfile_name = malloc_safe(outfile_name_len + 1);
-		strcpy(outfile_name, infile_name);
-		strcat(outfile_name, suffix);
+		allocated_name = malloc_safe(outfile_name_len + 1);
+		outfile_name = allocated_name;
+		strncpy(outfile_name, infile_name, infile_name_len + 1);
+		strncat(outfile_name, suffix, outfile_name_len + 1);
 	}
 
 	open_in_file(&in, infile_name);
@@ -615,6 +618,7 @@ int compress_file(void)
 		goto compress_file_cleanup;
 
 	if (infile_name_len != 0 && infile_name_len == outfile_name_len
+	    && infile_name != NULL && outfile_name != NULL
 	    && strncmp(infile_name, outfile_name, infile_name_len) == 0) {
 		log_print(ERROR, "igzip: Error input and output file names must differ\n");
 		goto compress_file_cleanup;
@@ -668,7 +672,6 @@ int compress_file(void)
 			size_t outbuf_used = 0;
 			uint8_t *iptr = inbuf;
 			uint8_t *optr = outbuf;
-			ret = 0;
 
 			for (q = 0; q < MAX_JOBQUEUE - 1; q++) {
 				inbuf_used += BLOCK_SIZE;
@@ -741,8 +744,8 @@ int compress_file(void)
 		} while (!end_of_stream);
 
 		// Write gzip trailer
-		ret = fwrite_safe(&crc, sizeof(uint32_t), 1, out, outfile_name);
-		ret += fwrite_safe(&total_in, sizeof(uint32_t), 1, out, outfile_name);
+		fwrite_safe(&crc, sizeof(uint32_t), 1, out, outfile_name);
+		fwrite_safe(&total_in, sizeof(uint32_t), 1, out, outfile_name);
 
 #else // No compiled threading support but asked for threads > 1
 		assert(1);
@@ -788,8 +791,8 @@ int compress_file(void)
 			remove(infile_name);
 	}
 
-	if (global_options.outfile_name == NULL && outfile_name != NULL)
-		free(outfile_name);
+	if (allocated_name != NULL)
+		free(allocated_name);
 
 	return (success == 0);
 }
@@ -804,8 +807,9 @@ int decompress_file(void)
 	const int terminal = 0, implicit = 1, stripped = 2;
 	int ret = 0, success = 0, outfile_type = terminal;
 
-	char *infile_name = global_options.infile_name, *outfile_name =
-	    global_options.outfile_name;
+	char *infile_name = global_options.infile_name;
+	char *outfile_name = global_options.outfile_name;
+	char *allocated_name = NULL;
 	char *suffix = global_options.suffix;
 	size_t infile_name_len = global_options.infile_name_len;
 	size_t outfile_name_len = global_options.outfile_name_len;
@@ -813,7 +817,9 @@ int decompress_file(void)
 	int suffix_index = 0;
 	uint32_t file_time;
 
+	// Allocate mem and setup to hold gzip header info
 	if (infile_name_len == stdin_file_name_len &&
+	    infile_name != NULL &&
 	    memcmp(infile_name, stdin_file_name, infile_name_len) == 0) {
 		infile_name = NULL;
 		infile_name_len = 0;
@@ -849,10 +855,12 @@ int decompress_file(void)
 			outfile_name_len = 0;
 			outfile_type = implicit;
 		}
-		if (outfile_type != terminal)
-			outfile_name = malloc_safe(outfile_name_len >=
-						   MAX_FILEPATH_BUF ? outfile_name_len +
-						   1 : MAX_FILEPATH_BUF);
+		if (outfile_type != terminal) {
+			allocated_name = malloc_safe(outfile_name_len >=
+						     MAX_FILEPATH_BUF ? outfile_name_len +
+						     1 : MAX_FILEPATH_BUF);
+			outfile_name = allocated_name;
+		}
 	}
 
 	open_in_file(&in, infile_name);
@@ -877,6 +885,7 @@ int decompress_file(void)
 	state.next_in = inbuf;
 	state.avail_in = fread_safe(state.next_in, 1, inbuf_size, in, infile_name);
 
+	// Actually read and save the header info
 	ret = isal_read_gzip_header(&state, &gz_hdr);
 	if (ret != ISAL_DECOMP_OK) {
 		log_print(ERROR, "igzip: Error invalid gzip header found for file %s\n",
@@ -887,13 +896,16 @@ int decompress_file(void)
 	if (outfile_type == implicit)
 		file_time = gz_hdr.time;
 
-	if (outfile_type == stripped || (outfile_type == implicit && outfile_name[0] == 0)) {
+	if (outfile_name != NULL && infile_name != NULL
+	    && (outfile_type == stripped
+		|| (outfile_type == implicit && outfile_name[0] == 0))) {
 		outfile_name_len = infile_name_len - suffix_len;
 		memcpy(outfile_name, infile_name, outfile_name_len);
 		outfile_name[outfile_name_len] = 0;
 	}
 
 	if (infile_name_len != 0 && infile_name_len == outfile_name_len
+	    && infile_name != NULL && outfile_name != NULL
 	    && strncmp(infile_name, outfile_name, infile_name_len) == 0) {
 		log_print(ERROR, "igzip: Error input and output file names must differ\n");
 		goto decompress_file_cleanup;
@@ -905,6 +917,7 @@ int decompress_file(void)
 			goto decompress_file_cleanup;
 	}
 
+	// Start reading in compressed data and decompress
 	do {
 		if (state.avail_in == 0) {
 			state.next_in = inbuf;
@@ -926,7 +939,55 @@ int decompress_file(void)
 		if (out != NULL)
 			fwrite_safe(outbuf, 1, state.next_out - outbuf, out, outfile_name);
 
-	} while (!feof(in) || state.avail_out == 0);
+	} while (state.block_state != ISAL_BLOCK_FINISH	// while not done
+		 && (!feof(in) || state.avail_out == 0)	// and work to do
+	    );
+
+	// Add the following to look for and decode additional concatenated files
+	if (!feof(in) && state.avail_in == 0) {
+		state.next_in = inbuf;
+		state.avail_in = fread_safe(state.next_in, 1, inbuf_size, in, infile_name);
+	}
+
+	while (state.avail_in > 0 && state.next_in[0] == 31) {
+		// Look for magic numbers for gzip header. Follows the gzread() decision
+		// whether to treat as trailing junk
+		if (state.avail_in > 1 && state.next_in[1] != 139)
+			break;
+
+		isal_inflate_reset(&state);
+		state.crc_flag = ISAL_GZIP;	// Let isal_inflate() process extra headers
+		do {
+			if (state.avail_in == 0 && !feof(in)) {
+				state.next_in = inbuf;
+				state.avail_in =
+				    fread_safe(state.next_in, 1, inbuf_size, in, infile_name);
+			}
+
+			state.next_out = outbuf;
+			state.avail_out = outbuf_size;
+
+			ret = isal_inflate(&state);
+			if (ret != ISAL_DECOMP_OK) {
+				log_print(ERROR,
+					  "igzip: Error while decompressing extra concatenated"
+					  "gzip files on %s\n", infile_name);
+				goto decompress_file_cleanup;
+			}
+
+			if (out != NULL)
+				fwrite_safe(outbuf, 1, state.next_out - outbuf, out,
+					    outfile_name);
+
+		} while (state.block_state != ISAL_BLOCK_FINISH
+			 && (!feof(in) || state.avail_out == 0));
+
+		if (!feof(in) && state.avail_in == 0) {
+			state.next_in = inbuf;
+			state.avail_in =
+			    fread_safe(state.next_in, 1, inbuf_size, in, infile_name);
+		}
+	}
 
 	if (state.block_state != ISAL_BLOCK_FINISH)
 		log_print(ERROR, "igzip: Error %s does not contain a complete gzip file\n",
@@ -947,8 +1008,8 @@ int decompress_file(void)
 			remove(infile_name);
 	}
 
-	if (global_options.outfile_name == NULL && outfile_name != NULL)
-		free(outfile_name);
+	if (allocated_name != NULL)
+		free(allocated_name);
 
 	return (success == 0);
 }

@@ -3,7 +3,7 @@
 
 AC_PREREQ(2.69)
 AC_INIT([libisal],
-        [2.27.0],
+        [2.30.0],
         [sg.support.isal@intel.com],
         [isa-l],
         [http://01.org/storage-acceleration-library])
@@ -30,10 +30,13 @@ AS_CASE([$host_cpu],
   [i?86], [CPU="x86_32"],
   [aarch64], [CPU="aarch64"],
   [arm64], [CPU="aarch64"],
+  [powerpc64le], [CPU="ppc64le"],
+  [ppc64le], [CPU="ppc64le"],
 )
 AM_CONDITIONAL([CPU_X86_64], [test "$CPU" = "x86_64"])
 AM_CONDITIONAL([CPU_X86_32], [test "$CPU" = "x86_32"])
 AM_CONDITIONAL([CPU_AARCH64], [test "$CPU" = "aarch64"])
+AM_CONDITIONAL([CPU_PPC64LE], [test "$CPU" = "ppc64le"])
 AM_CONDITIONAL([CPU_UNDEFINED], [test "x$CPU" = "x"])
 
 if test "$CPU" = "x86_64"; then
@@ -48,6 +51,7 @@ fi
 
 # Check for programs
 AC_PROG_CC_STDC
+AC_PROG_LD
 AC_USE_SYSTEM_EXTENSIONS
 AM_SILENT_RULES([yes])
 LT_INIT
@@ -65,67 +69,157 @@ AS_IF([test "x$enable_debug" = "xyes"], [
 
 # If this build is for x86, look for yasm and nasm
 if test x"$is_x86" = x"yes"; then
-  # Check for yasm and yasm features
-  AC_CHECK_PROG(HAVE_YASM, yasm, yes, no)
-  if test "$HAVE_YASM" = "no"; then
-    AC_MSG_RESULT([no yasm])
-  else
-    AC_MSG_CHECKING([for modern yasm])
-    AC_LANG_CONFTEST([AC_LANG_SOURCE([[vmovdqa %xmm0, %xmm1;]])])
-    if yasm -f elf64 -p gas conftest.c ; then
-      with_modern_yasm=yes
-      AC_MSG_RESULT([yes])
-      AC_MSG_CHECKING([for optional yasm AVX512 support])
-      AC_LANG_CONFTEST([AC_LANG_SOURCE([[vpshufb %zmm0, %zmm1, %zmm2;]])])
-      if yasm -f elf64 -p gas conftest.c 2> /dev/null; then
-        yasm_knows_avx512=yes
+  AC_MSG_CHECKING([whether Intel CET is enabled])
+  AC_TRY_COMPILE([],[
+#ifndef __CET__
+# error CET is not enabled
+#endif],
+		  [AC_MSG_RESULT([yes])
+		   intel_cet_enabled=yes],
+		  [AC_MSG_RESULT([no])
+		   intel_cet_enabled=no])
+
+
+  # Pick an assembler yasm or nasm
+  if test x"$AS" = x""; then
+    # Check for yasm and yasm features
+    yasm_feature_level=0
+    AC_CHECK_PROG(HAVE_YASM, yasm, yes, no)
+    if test "$HAVE_YASM" = "yes"; then
+       yasm_feature_level=1
+    else
+       AC_MSG_RESULT([no yasm])
+    fi
+    if test x"$yasm_feature_level" = x"1"; then
+       AC_MSG_CHECKING([for modern yasm])
+       AC_LANG_CONFTEST([AC_LANG_SOURCE([[vmovdqa %xmm0, %xmm1;]])])
+       if yasm -f elf64 -p gas conftest.c ; then
+         AC_MSG_RESULT([yes])
+         yasm_feature_level=4
+       else
+         AC_MSG_RESULT([no])
+       fi
+    fi
+    if test x"$yasm_feature_level" = x"4"; then
+       AC_MSG_CHECKING([for optional yasm AVX512 support])
+       AC_LANG_CONFTEST([AC_LANG_SOURCE([[vpshufb %zmm0, %zmm1, %zmm2;]])])
+       if yasm -f elf64 -p gas conftest.c 2> /dev/null; then
+         AC_MSG_RESULT([yes])
+         yasm_feature_level=6
+       else
+         AC_MSG_RESULT([no])
+       fi
+    fi
+    if test x"$yasm_feature_level" = x"6"; then
+      AC_MSG_CHECKING([for additional yasm AVX512 support])
+      AC_LANG_CONFTEST([AC_LANG_SOURCE([[vpcompressb zmm0, k1, zmm1;]])])
+      sed -i -e '/vpcompressb/!d' conftest.c
+      if yasm -f elf64  conftest.c 2> /dev/null; then
         AC_MSG_RESULT([yes])
+        yasm_feature_level=10
       else
         AC_MSG_RESULT([no])
       fi
-    else
-      AC_MSG_FAILURE([no])
     fi
-  fi
 
-  # Check for nasm and nasm features
-  AC_CHECK_PROG(HAVE_NASM, nasm, yes, no)
-  if test "$HAVE_NASM" = "no"; then
-    AC_MSG_RESULT([no nasm])
-  else
-    AC_MSG_CHECKING([for modern nasm])
-    AC_LANG_CONFTEST([AC_LANG_SOURCE([[pblendvb xmm2, xmm1;]])])
-    sed -i -e '/pblendvb/!d' conftest.c
-    if nasm -f elf64 conftest.c 2> /dev/null; then
-      with_modern_nasm=yes
-      AC_MSG_RESULT([yes])
+    # Check for nasm and nasm features
+    nasm_feature_level=0
+    AC_CHECK_PROG(HAVE_NASM, nasm, yes, no)
+    if test "$HAVE_NASM" = "yes"; then
+       nasm_feature_level=1
+    else
+       AC_MSG_RESULT([no nasm])
+    fi
+
+    if test x"$nasm_feature_level" = x"1"; then
+      AC_MSG_CHECKING([for modern nasm])
+      AC_LANG_CONFTEST([AC_LANG_SOURCE([[pblendvb xmm2, xmm1;]])])
+      sed -i -e '/pblendvb/!d' conftest.c
+      if nasm -f elf64 conftest.c 2> /dev/null; then
+        AC_MSG_RESULT([yes])
+        nasm_feature_level=4
+      else
+        AC_MSG_RESULT([no])
+      fi
+    fi
+    if test x"$nasm_feature_level" = x"4"; then
       AC_MSG_CHECKING([for optional nasm AVX512 support])
       AC_LANG_CONFTEST([AC_LANG_SOURCE([[vinserti32x8 zmm0, ymm1, 1;]])])
       sed -i -e '/vinsert/!d' conftest.c
       if nasm -f elf64  conftest.c 2> /dev/null; then
-        nasm_knows_avx512=yes
         AC_MSG_RESULT([yes])
+        nasm_feature_level=6
       else
         AC_MSG_RESULT([no])
       fi
+    fi
+    if test x"$nasm_feature_level" = x"6"; then
+      AC_MSG_CHECKING([for additional nasm AVX512 support])
+      AC_LANG_CONFTEST([AC_LANG_SOURCE([[vpcompressb zmm0 {k1}, zmm1;]])])
+      sed -i -e '/vpcompressb/!d' conftest.c
+      if nasm -f elf64  conftest.c 2> /dev/null; then
+        AC_MSG_RESULT([yes])
+        nasm_feature_level=10
+      else
+        AC_MSG_RESULT([no])
+      fi
+    fi
+
+    if test $nasm_feature_level -ge $yasm_feature_level ; then
+      AS=nasm
+      as_feature_level=$nasm_feature_level
     else
-      AC_MSG_RESULT([no])
+      AS=yasm
+      as_feature_level=$yasm_feature_level
+    fi
+
+  else
+    # Check for $AS supported features
+    as_feature_level=0
+    AC_CHECK_PROG(HAVE_AS, $AS, yes, no)
+    if test "$HAVE_AS" = "yes"; then
+       as_feature_level=1
+    else
+       AC_MSG_ERROR([no $AS])
+    fi
+
+    if test x"$as_feature_level" = x"1"; then
+      AC_MSG_CHECKING([for modern $AS])
+      AC_LANG_CONFTEST([AC_LANG_SOURCE([[pblendvb xmm2, xmm1;]])])
+      sed -i -e '/pblendvb/!d' conftest.c
+      if $AS -f elf64 conftest.c 2> /dev/null; then
+        AC_MSG_RESULT([yes])
+        as_feature_level=4
+      else
+        AC_MSG_RESULT([no])
+      fi
+    fi
+    if test x"$as_feature_level" = x"4"; then
+      AC_MSG_CHECKING([for optional as AVX512 support])
+      AC_LANG_CONFTEST([AC_LANG_SOURCE([[vinserti32x8 zmm0, ymm1, 1;]])])
+      sed -i -e '/vinsert/!d' conftest.c
+      if $AS -f elf64  conftest.c 2> /dev/null; then
+        AC_MSG_RESULT([yes])
+        as_feature_level=6
+      else
+        AC_MSG_RESULT([no])
+      fi
+    fi
+    if test x"$as_feature_level" = x"6"; then
+      AC_MSG_CHECKING([for additional as AVX512 support])
+      AC_LANG_CONFTEST([AC_LANG_SOURCE([[vpcompressb zmm0, k1, zmm1;]])])
+      sed -i -e '/vpcompressb/!d' conftest.c
+      if $AS -f elf64  conftest.c 2> /dev/null; then
+        AC_MSG_RESULT([yes])
+        as_feature_level=10
+      else
+        AC_MSG_RESULT([no])
+      fi
     fi
   fi
 
-  # Pick an assembler yasm or nasm
-  if test x"$AS" = x""; then
-    if test x"$yasm_knows_avx512" = x"yes"; then
-      AS=yasm
-    elif test x"$nasm_knows_avx512" = x"yes"; then
-      AS=nasm
-    elif test x"$with_modern_yasm" = x"yes"; then
-      AS=yasm
-    elif test x"$with_modern_nasm" = x"yes"; then
-      AS=nasm
-    else
-      AC_MSG_ERROR([No modern yasm or nasm found as required. Yasm should be 1.2.0 or later, and nasm should be v2.11.01 or later (v2.13 for AVX512).])
-    fi
+  if test $as_feature_level -lt 2 ; then
+    AC_MSG_ERROR([No modern nasm or yasm found as required. Nasm should be v2.11.01 or later (v2.13 for AVX512) and yasm should be 1.2.0 or later.])
   fi
 
   case $host_os in
@@ -138,19 +232,15 @@ if test x"$is_x86" = x"yes"; then
 
   # Fix for nasm missing windows features
   if test x"$arch" = x"mingw"; then
-    if test x"$with_modern_yasm" = x"yes"; then
-      AS=yasm
-      if test x"$yasm_knows_avx512" = x"yes"; then
-        have_as_knows_avx512=yes
-      else
-        have_as_knows_avx512=no
-      fi
-    else
+    AS=yasm
+    as_feature_level=$yasm_feature_level
+    if test $as_feature_level -lt 2 ; then
       AC_MSG_ERROR([Mingw build requires Yasm 1.2.0 or later.])
     fi
   fi
 
-  if test \( x"$AS" = x"yasm" -a x"$yasm_knows_avx512" = x"yes" \) -o \( x"$AS" = x"nasm" -a x"$nasm_knows_avx512" = x"yes" \); then
+  AC_DEFINE_UNQUOTED(AS_FEATURE_LEVEL, [$as_feature_level], [Assembler feature level.])
+  if test $as_feature_level -ge 6 ; then
     AC_DEFINE(HAVE_AS_KNOWS_AVX512, [1], [Assembler can do AVX512.])
     have_as_knows_avx512=yes
   else
@@ -171,6 +261,7 @@ else
   AM_CONDITIONAL(DARWIN, test "x" = "y")
 fi
 
+AM_CONDITIONAL(INTEL_CET_ENABLED, [test x"$intel_cet_enabled" = x"yes"])
 
 # Check for header files
 AC_CHECK_HEADERS([limits.h stdint.h stdlib.h string.h])

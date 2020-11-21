@@ -199,7 +199,7 @@ void gf_vect_dot_prod(int len, int vlen, unsigned char *gftbls,
  * This function determines what instruction sets are enabled and selects the
  * appropriate version at runtime.
  *
- * @param len    Length of each vector in bytes. Must be >= 32.
+ * @param len    Length of each vector in bytes. Must be >= 64.
  * @param vec    The number of vector sources or rows in the generator matrix
  * 		 for coding.
  * @param vec_i  The vector index corresponding to the single input source.
@@ -926,7 +926,10 @@ void gf_gen_cauchy1_matrix(unsigned char *a, int m, int k);
 /**
  * @brief Invert a matrix in GF(2^8)
  *
- * @param in  input matrix
+ * Attempts to construct an n x n inverse of the input matrix. Returns non-zero
+ * if singular. Will always destroy input matrix in process.
+ *
+ * @param in  input matrix, destroyed by invert process
  * @param out output matrix such that [in] x [out] = [I] - identity matrix
  * @param n   size of matrix [nxn]
  * @returns 0 successful, other fail on singular input matrix

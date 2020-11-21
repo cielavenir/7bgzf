@@ -35,24 +35,39 @@ lsrc  += \
 
 lsrc_base_aliases += crc/crc_base_aliases.c
 lsrc_x86_32       += crc/crc_base_aliases.c
+lsrc_ppc64le      += crc/crc_base_aliases.c
 
 lsrc_x86_64 += \
 	crc/crc16_t10dif_01.asm \
 	crc/crc16_t10dif_by4.asm \
+	crc/crc16_t10dif_02.asm \
+	crc/crc16_t10dif_by16_10.asm \
 	crc/crc16_t10dif_copy_by4.asm \
+	crc/crc16_t10dif_copy_by4_02.asm \
 	crc/crc32_ieee_01.asm \
+	crc/crc32_ieee_02.asm \
 	crc/crc32_ieee_by4.asm \
+	crc/crc32_ieee_by16_10.asm \
 	crc/crc32_iscsi_01.asm \
 	crc/crc32_iscsi_00.asm \
+	crc/crc32_iscsi_by16_10.asm \
 	crc/crc_multibinary.asm \
 	crc/crc64_multibinary.asm \
 	crc/crc64_ecma_refl_by8.asm \
+	crc/crc64_ecma_refl_by16_10.asm \
 	crc/crc64_ecma_norm_by8.asm \
+	crc/crc64_ecma_norm_by16_10.asm \
 	crc/crc64_iso_refl_by8.asm \
+	crc/crc64_iso_refl_by16_10.asm \
 	crc/crc64_iso_norm_by8.asm \
+	crc/crc64_iso_norm_by16_10.asm \
 	crc/crc64_jones_refl_by8.asm \
+	crc/crc64_jones_refl_by16_10.asm \
 	crc/crc64_jones_norm_by8.asm \
-	crc/crc32_gzip_refl_by8.asm
+	crc/crc64_jones_norm_by16_10.asm \
+	crc/crc32_gzip_refl_by8.asm \
+	crc/crc32_gzip_refl_by8_02.asm \
+	crc/crc32_gzip_refl_by16_10.asm
 
 src_include += -I $(srcdir)/crc
 extern_hdrs +=  include/crc.h include/crc64.h

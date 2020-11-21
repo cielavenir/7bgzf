@@ -1,5 +1,5 @@
-########################################################################
-#  Copyright(c) 2019 Arm Corporation All rights reserved.
+##################################################################
+#  Copyright (c) 2019 Huawei Technologies Co., Ltd.
 #
 #  Redistribution and use in source and binary forms, with or without
 #  modification, are permitted provided that the following conditions
@@ -10,7 +10,7 @@
 #      notice, this list of conditions and the following disclaimer in
 #      the documentation and/or other materials provided with the
 #      distribution.
-#    * Neither the name of Arm Corporation nor the names of its
+#    * Neither the name of Huawei Corporation nor the names of its
 #      contributors may be used to endorse or promote products derived
 #      from this software without specific prior written permission.
 #
@@ -25,52 +25,21 @@
 #  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 #  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 #  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-#########################################################################
+########################################################################
 
-/* TODO: support SVE */
-.macro mbin_dispatch name:req, func_neon:req, func_sve
-	.section .data
-	.balign 8
-	\name\()_dispatched:
-		.quad	\name\()_dispatch_init
-
-	.text
-	.global \name
-	.type \name, %function
-
-	\name\():
-		adrp	x9, \name\()_dispatched
-		ldr	x10, [x9, :lo12:\name\()_dispatched]
-		br	x10
-	\name\()_dispatch_init:
-		add	x9, x9, :lo12:\name\()_dispatched
-		adrp	x10, :got:\func_neon
-		ldr	x10, [x10, :got_lo12:\func_neon]
-		str	x10, [x9]
-		br	x10
-.endm
-
-#if 0
-Macro expanded: mbin_dispatch xor_gen, xor_gen_neon
-
-.section .data
-.balign 8
-
-xor_gen_dispatched:
-	.quad	xor_gen_dispatch_init
-
-.text
-
-.global xor_gen
-xor_gen:
-	adrp	x9, xor_gen_dispatched
-	ldr	x10, [x9, :lo12:xor_gen_dispatched]
-	br	x10
-
-xor_gen_dispatch_init:
-	add	x9, x9, :lo12:xor_gen_dispatched
-	adrp	x10, :got:xor_gen_neon
-	ldr	x10, [x10, :got_lo12:xor_gen_neon]
-	str	x10, [x9]
-	br	x10
-#endif
+lsrc_aarch64 += \
+		erasure_code/aarch64/ec_aarch64_highlevel_func.c \
+		erasure_code/aarch64/ec_aarch64_dispatcher.c \
+		erasure_code/aarch64/gf_vect_dot_prod_neon.S \
+		erasure_code/aarch64/gf_2vect_dot_prod_neon.S \
+		erasure_code/aarch64/gf_3vect_dot_prod_neon.S \
+		erasure_code/aarch64/gf_4vect_dot_prod_neon.S \
+		erasure_code/aarch64/gf_5vect_dot_prod_neon.S \
+		erasure_code/aarch64/gf_vect_mad_neon.S \
+		erasure_code/aarch64/gf_2vect_mad_neon.S \
+		erasure_code/aarch64/gf_3vect_mad_neon.S \
+		erasure_code/aarch64/gf_4vect_mad_neon.S \
+		erasure_code/aarch64/gf_5vect_mad_neon.S \
+		erasure_code/aarch64/gf_6vect_mad_neon.S \
+		erasure_code/aarch64/gf_vect_mul_neon.S \
+		erasure_code/aarch64/ec_multibinary_arm.S

@@ -38,7 +38,23 @@ lsrc        += 	igzip/igzip.c \
 
 lsrc_base_aliases += igzip/igzip_base_aliases.c igzip/proc_heap_base.c
 lsrc_x86_32       += igzip/igzip_base_aliases.c igzip/proc_heap_base.c
-lsrc_aarch64      += igzip/igzip_base_aliases.c igzip/proc_heap_base.c
+lsrc_ppc64le      += igzip/igzip_base_aliases.c igzip/proc_heap_base.c
+
+lsrc_aarch64 +=	igzip/aarch64/igzip_inflate_multibinary_arm64.S  \
+		igzip/aarch64/igzip_multibinary_arm64.S	\
+		igzip/aarch64/igzip_isal_adler32_neon.S	\
+		igzip/aarch64/igzip_multibinary_aarch64_dispatcher.c \
+		igzip/aarch64/igzip_deflate_body_aarch64.S \
+		igzip/aarch64/igzip_deflate_finish_aarch64.S \
+		igzip/aarch64/isal_deflate_icf_body_hash_hist.S \
+		igzip/aarch64/isal_deflate_icf_finish_hash_hist.S \
+		igzip/aarch64/igzip_set_long_icf_fg.S \
+		igzip/aarch64/encode_df.S \
+		igzip/aarch64/isal_update_histogram.S \
+		igzip/aarch64/gen_icf_map.S \
+		igzip/aarch64/igzip_deflate_hash_aarch64.S \
+		igzip/aarch64/igzip_decode_huffman_code_block_aarch64.S \
+		igzip/proc_heap_base.c
 
 lsrc_x86_64 +=	igzip/igzip_body.asm \
 		igzip/igzip_finish.asm \

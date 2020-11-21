@@ -39,9 +39,16 @@
 #	trace - get simulator trace
 #	clean - remove object files
 
-version ?= 2.27.0
+version ?= 2.30.0
 host_cpu ?= $(shell uname -m | sed -e 's/amd/x86_/')
 arch ?= $(shell uname | grep -v -e Linux -e BSD )
+
+# aarch64 cpu arch = aarch64
+ifeq ($(host_cpu)_$(arch),aarch64_)
+  arch = aarch64
+endif
+
+CC  = $(PREFIX)gcc
 
 ifeq ($(CC),cc)
 	CC = gcc
@@ -62,13 +69,13 @@ DEBUG_nasm = -g
 # Default arch= build options
 CFLAGS_    = -Wall
 ASFLAGS_   = -f elf64
-ARFLAGS_   = crus $@
+ARFLAGS_   = cr $@
 STRIP_gcc  = strip -d -R .comment $@
 
 # arch=32 build options
-ASFLAGS_32 = -f macho32
+ASFLAGS_32 = -f elf32
 CFLAGS_32  = -m32
-ARFLAGS_32 = crus $@
+ARFLAGS_32 = cr $@
 
 # arch=win64 build options
 ASFLAGS_win64 = -f win64
@@ -77,7 +84,7 @@ ARFLAGS_win64 = -out:$@
 
 # arch=mingw build options
 ASFLAGS_mingw = -f win64
-ARFLAGS_mingw = crus $@
+ARFLAGS_mingw = cr $@
 
 LDFLAGS_so = -Wl,-soname,$(soname)
 
@@ -97,6 +104,19 @@ ifeq ($(arch),noarch)
   host_cpu=base_aliases
 endif
 
+# arch=aarch64 build options
+ifeq ($(lib_debug),1)
+  ASFLAGS_aarch64 = -g -c
+else
+  ASFLAGS_aarch64 = -c
+endif
+
+ARFLAGS_aarch64 = cr $@
+ifeq ($(arch),aarch64)
+  AS=$(CC) -D__ASSEMBLY__
+  SIM=
+endif
+
 ASFLAGS_Darwin = -f macho64 --prefix=_
 ARFLAGS_Darwin = -r $@
 ifeq ($(shell uname),Darwin)
@@ -105,11 +125,16 @@ ifeq ($(shell uname),Darwin)
 endif
 
 INCLUDE   = $(patsubst %,-I%/,$(subst :, ,$(VPATH)))
-CFLAGS  += $(CFLAGS_$(arch)) $(CFLAGS_$(CC)) $(DEBUG) -O2 $(DEFINES) $(INCLUDE)
+CFLAGS   = $(CFLAGS_$(arch)) $(CFLAGS_$(CC)) $(DEBUG) -O2 $(DEFINES) $(INCLUDE)
 ASFLAGS  = $(ASFLAGS_$(arch)) $(ASFLAGS_$(CC)) $(DEBUG_$(AS)) $(DEFINES) $(INCLUDE)
 ARFLAGS  = $(ARFLAGS_$(arch))
 DEFINES += $(addprefix -D , $D)
 CLEANFILES += $(O) *.o *.a $(all_tests) $(bin_PROGRAMS) $(lib_name) $(so_lib_name) $(all_llvm_fuzz_tests)
+
+# set host_cpu=base_aliases for unsupported CPUs
+ifeq ($(filter aarch64 x86_%,$(host_cpu)),)
+  host_cpu=base_aliases
+endif
 
 other_tests += $(other_tests_$(host_cpu))
 
@@ -154,16 +179,30 @@ $(all_llvm_fuzz_tests): CXXFLAGS += -fsanitize-coverage=trace-pc-guard -fsanitiz
 $(all_llvm_fuzz_tests): % : %.o $(lib_name)
 	$(CXX) $(CXXFLAGS)  $^ $(LDLIBS) $(FUZZLINK) -o $@
 
+
 # Check for modern as
-tmpfile := $(shell mktemp)
-have_as_w_avx512 ?= $(shell printf "vinserti32x8 zmm0, ymm1, 1;" > ${tmpfile} && $(AS) $(ASFLAGS) ${tmpfile} -o /dev/null 2> /dev/null && echo y; rm ${tmpfile})
-D_HAVE_AS_KNOWS_AVX512_$(have_as_w_avx512) := -DHAVE_AS_KNOWS_AVX512
-CFLAGS  += $(D_HAVE_AS_KNOWS_AVX512_y)
-ASFLAGS += $(D_HAVE_AS_KNOWS_AVX512_y)
+test-as = $(shell hash printf && printf $(3) > $(2) && $(AS) $(ASFLAGS) ${tmpf} -o /dev/null 2> /dev/null && echo $(1) || echo $(4))
+as_4  := "pblendvb xmm2, xmm1;"
+as_6  := "vinserti32x8 zmm0, ymm1, 1;"
+as_10 := "vpcompressb zmm0 {k1}, zmm1;"
+
+tmpf := $(shell mktemp)
+as_feature_level := $(call test-as, 4,  $(tmpf), $(as_4),  $(as_feature_level))
+as_feature_level := $(call test-as, 6,  $(tmpf), $(as_6),  $(as_feature_level))
+as_feature_level := $(call test-as, 10, $(tmpf), $(as_10), $(as_feature_level))
+tmpf := $(shell rm ${tmpf})
+
+ifneq ($(findstring $(as_feature_level),6 10),)
+  D_HAVE_AS_KNOWS_AVX512_y := -DHAVE_AS_KNOWS_AVX512
+endif
+
+CFLAGS  += -DAS_FEATURE_LEVEL=$(as_feature_level) $(D_HAVE_AS_KNOWS_AVX512_y)
+ASFLAGS += -DAS_FEATURE_LEVEL=$(as_feature_level) $(D_HAVE_AS_KNOWS_AVX512_y)
+
 
 # Check for pthreads
-have_threads ?= $(shell printf "\#include <pthread.h>\nint main(void){return 0;}\n" | $(CC) -x c - -o /dev/null -pthread && echo y )
-THREAD_LD_$(have_threads) := -pthread
+have_threads ?= $(shell printf "\#include <pthread.h>\nint main(void){return 0;}\n" | $(CC) -x c - -o /dev/null -lpthread && echo y )
+THREAD_LD_$(have_threads) := -lpthread
 THREAD_CFLAGS_$(have_threads) := -DHAVE_THREADS
 
 progs: $(bin_PROGRAMS)
@@ -204,8 +243,11 @@ $(O)/%.o: %.asm
 # gcc assembly files
 $(O)/%.o: $(host_cpu)/%.S
 	@echo "  ---> Building $< $(msg)"
-	@$(COMPILE.c) $(OUTPUT_OPTION) $<
+	@$(AS) $(ASFLAGS) -o $@ $<
 
+$(O)/%.o   : $(host_cpu)/%.c
+	@echo "  ---> Building $< $(msg)"
+	@$(COMPILE.c) $(OUTPUT_OPTION) $<
 $(O)/%.o %.o: %.c
 	@echo "  ---> Building $< $(msg)"
 	@$(COMPILE.c) $(OUTPUT_OPTION) $<
@@ -234,7 +276,9 @@ endif
 $(lib_name): $(objs)
 	@echo "  ---> Creating Lib $@"
 	@$(AR) $(ARFLAGS) $^
+ifneq ($(lib_debug),1)
 	@$(STRIP_$(CC))
+endif
 
 
 # Target for shared lib
@@ -251,7 +295,9 @@ shared_objs  += $(addprefix $(O)/shared_ver_,$(patsubst %.c,%.o,$(filter %.c,$(n
 $(O)/shared_ver_%.o: %.c
 	@echo "  ---> Building shared $< $(msg)"
 	@$(COMPILE.c) $(OUTPUT_OPTION) $<
-
+$(O)/shared_ver_%.o: $(host_cpu)/%.c
+	@echo "  ---> Building shared $< $(msg)"
+	@$(COMPILE.c) $(OUTPUT_OPTION) $<
 ifneq ($(lib_debug),1)
  $(so_lib_name): DEBUG_$(AS)=
  $(so_lib_name): DEBUG=
@@ -340,4 +386,3 @@ doc: isa-l.h
 	(cat Doxyfile; echo 'PROJECT_NUMBER=$(version)') | doxygen -
 	$(MAKE) -C generated_doc/latex &> generated_doc/latex_build_api.log
 	cp generated_doc/latex/refman.pdf isa-l_api_$(version).pdf
-
