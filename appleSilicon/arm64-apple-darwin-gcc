@@ -1,3 +1,4 @@
 #!/bin/sh
-xcode=/Applications/Xcode-beta.app
-$xcode/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -isysroot $xcode/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX11.0.sdk "$@" -arch arm64
+SCRIPT_DIR=$(dirname $(realpath $0))
+source $SCRIPT_DIR/arm64-apple-darwin.conf
+$XCODE/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -isysroot $SYSROOT -arch arm64 "$@"

@@ -15,10 +15,10 @@ echo "Android arm"
 ### -mfloat-abi=softfp -mfpu=neon is required to enable NEON intrinsics.
 ### (keeping -D__ARM_NEON for noticing compilation error)
 #ARCH="-mthumb -march=armv7-a -mfloat-abi=softfp -mfpu=neon -pthread -fPIE -Dfseeko=fseek -Dftello=ftell -D__ARM_NEON"
-ARCH="-pthread -fPIE -D__ARM_NEON -DHAVE_STPCPY -DDL_ANDROID" host_cpu=aarch64 PREFIX=aarch64-linux-android- LIBS="-pie -lm -ldl -pthread" SUFF=_android make
+ARCH="-pthread -fPIE -D__ARM_NEON -DHAVE_STPCPY -DDL_ANDROID" arch=aarch64 host_cpu=aarch64 PREFIX=aarch64-linux-android- LIBS="-pie -lm -ldl -pthread" SUFF=_android make
 make clean
 echo "Android x86"
-ZLIBNG_X86=1 ARCH="-fPIE -pthread -DHAVE_STPCPY -DDL_ANDROID" host_cpu=x86_64 PREFIX=x86_64-linux-android- LIBS="-pie -lm -ldl -pthread" SUFF=_android_x86 make
+ZLIBNG_X86=1 ARCH="-fPIE -pthread -DHAVE_STPCPY -DDL_ANDROID" arch= host_cpu=x86_64 PREFIX=x86_64-linux-android- LIBS="-pie -lm -ldl -pthread" SUFF=_android_x86 make
 make clean
 
 #upx-lzma --best --lzma cielbox_android
