@@ -332,6 +332,7 @@ static void copy_lit(struct slz_stream *strm, const void *buf, uint32_t len, int
 		copy_16b(strm, len2);  // len2
 		copy_16b(strm, ~len2); // nlen2
 		memcpy(strm->outbuf, buf, len2);
+		buf += len2;
 		strm->outbuf += len2;
 	} while (len);
 }
@@ -372,7 +373,12 @@ static void copy_lit_huff(struct slz_stream *strm, const unsigned char *buf, uin
  */
 static inline uint32_t slz_hash(uint32_t a)
 {
+#if defined(__ARM_FEATURE_CRC32)
+	__asm__ volatile("crc32w %w0,%w0,%w1" : "+r"(a) : "r"(0));
+	return a >> (32 - HASH_BITS);
+#else
 	return ((a << 19) + (a << 6) - a) >> (32 - HASH_BITS);
+#endif
 }
 
 /* This function compares buffers <a> and <b> and reads 32 or 64 bits at a time
@@ -862,15 +868,27 @@ static const unsigned char gzip_hdr[] = { 0x1F, 0x8B,   // ID1, ID2
 
 static inline uint32_t crc32_char(uint32_t crc, uint8_t x)
 {
-	return crc32_fast[0][(crc ^ x) & 0xff] ^ (crc >> 8);
+#if defined(__ARM_FEATURE_CRC32)
+	crc = ~crc;
+	__asm__ volatile("crc32b %w0,%w0,%w1" : "+r"(crc) : "r"(x));
+	crc = ~crc;
+#else
+	crc = crc32_fast[0][(crc ^ x) & 0xff] ^ (crc >> 8);
+#endif
+	return crc;
 }
 
 static inline uint32_t crc32_uint32(uint32_t data)
 {
+#if defined(__ARM_FEATURE_CRC32)
+	__asm__ volatile("crc32w %w0,%w0,%w1" : "+r"(data) : "r"(~0UL));
+	data = ~data;
+#else
 	data = crc32_fast[3][(data >>  0) & 0xff] ^
 	       crc32_fast[2][(data >>  8) & 0xff] ^
 	       crc32_fast[1][(data >> 16) & 0xff] ^
 	       crc32_fast[0][(data >> 24) & 0xff];
+#endif
 	return data;
 }
 
@@ -893,6 +911,14 @@ uint32_t slz_crc32_by4(uint32_t crc, const unsigned char *buf, int len)
 
 	while (buf <= end - 16) {
 #ifdef UNALIGNED_LE_OK
+#if defined(__ARM_FEATURE_CRC32)
+		crc = ~crc;
+		__asm__ volatile("crc32w %w0,%w0,%w1" : "+r"(crc) : "r"(*(uint32_t*)(buf)));
+		__asm__ volatile("crc32w %w0,%w0,%w1" : "+r"(crc) : "r"(*(uint32_t*)(buf + 4)));
+		__asm__ volatile("crc32w %w0,%w0,%w1" : "+r"(crc) : "r"(*(uint32_t*)(buf + 8)));
+		__asm__ volatile("crc32w %w0,%w0,%w1" : "+r"(crc) : "r"(*(uint32_t*)(buf + 12)));
+		crc = ~crc;
+#else
 		crc ^= *(uint32_t *)buf;
 		crc = crc32_uint32(crc);
 
@@ -904,6 +930,7 @@ uint32_t slz_crc32_by4(uint32_t crc, const unsigned char *buf, int len)
 
 		crc ^= *(uint32_t *)(buf + 12);
 		crc = crc32_uint32(crc);
+#endif
 #else
 		crc = crc32_fast[3][(buf[0] ^ (crc >>  0)) & 0xff] ^
 		      crc32_fast[2][(buf[1] ^ (crc >>  8)) & 0xff] ^
@@ -1190,7 +1217,7 @@ uint32_t slz_adler32_block(uint32_t crc, const unsigned char *buf, long len)
 		 * have to take care of the values between 65521 and 65536.
 		 */
 		s1 = (s1 & 0xffff) + 15 * (s1 >> 16);
-		if (s1 > 65521)
+		if (s1 >= 65521)
 			s1 -= 65521;
 
 		/* For s2, the largest value is estimated to 2^32-1 for
@@ -1199,7 +1226,7 @@ uint32_t slz_adler32_block(uint32_t crc, const unsigned char *buf, long len)
 		 */
 		s2 = (s2 & 0xffff) + 15 * (s2 >> 16);
 		s2 = (s2 & 0xffff) + 15 * (s2 >> 16);
-		if (s2 > 65521)
+		if (s2 >= 65521)
 			s2 -= 65521;
 
 		buf += blk;

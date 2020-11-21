@@ -35,6 +35,7 @@ customize:
 //#define HAVE_VASPRINTF
 
 #if defined(FEOS)
+#include <stdio.h> //SEEK_CUR
 #else
 #define HAVE_FLOAT_H
 #endif
@@ -63,7 +64,7 @@ extern __const __int32_t *__ctype_toupper;
 # else
 #  ifndef _AIX
 /* AIX alloca decl has to be the first thing in the file, bletch! */
-char *alloca ();
+void *alloca (size_t siz);
 #  endif
 # endif
 #endif
