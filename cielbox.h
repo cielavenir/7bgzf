@@ -1,7 +1,7 @@
 #ifndef __CIELBOX_H__
 #define __CIELBOX_H__
 
-#define BOX_REVISION 200614
+#define BOX_REVISION 201125
 
 #ifdef __cplusplus
 extern "C"{
