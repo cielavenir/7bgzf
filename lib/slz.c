@@ -22,6 +22,8 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#undef __ARM_FEATURE_CRC32
+
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>

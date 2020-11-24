@@ -4,7 +4,7 @@ ifneq ($(BUILD),$(notdir $(CURDIR)))
 
 TARGET ?= cielbox
 
-SOURCES		+= applet lib lib/zlib lib/zopfli lib/libdeflate lib/popt .
+SOURCES		+= applet applet_stl applet/hash lib lib/cryptonite lib/libmshlsplash lib/zlib lib/zopfli lib/libdeflate lib/lz4 lib/zstd lib/libbzip2 lib/popt .
 INCLUDES	+= 
 DATA		+= data 
 
@@ -142,7 +142,7 @@ export OFILES	:=	$(addsuffix .o,$(BINFILES)) \
  
 $(BUILD):
 	@[ -d $@ ] || mkdir -p $@
-	@[ "$(NOIGZIP)" != "" ] || CC=$(PREFIX)gcc CFLAGS="$(subst -flto,,$(CFLAGS))" make -C lib/isa-l -f Makefile.unx lib programs/igzip
+	@[ "$(NOIGZIP)" != "" ] || CC=$(PREFIX)gcc CFLAGS="$(subst -flto,,$(CFLAGS))" CFLAGS_aarch64=-fno-stack-check make -C lib/isa-l -f Makefile.unx lib programs/igzip
 	@make --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile -j4
 
 clean:
