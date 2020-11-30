@@ -5,7 +5,7 @@
 #ifndef ZUTIL_P_H
 #define ZUTIL_P_H
 
-#ifdef __APPLE__
+#if defined(__APPLE__) || defined(__FreeBSD__)
 #  include <stdlib.h>
 #else
 #  include <malloc.h>
@@ -17,6 +17,10 @@ static inline void *zng_alloc(size_t size) {
     return (void *)_aligned_malloc(size, 64);
 #elif defined(__APPLE__)
     return (void *)malloc(size);     /* MacOS always aligns to 16 bytes */
+#elif defined(__FreeBSD__)
+    void *p=NULL;
+    posix_memalign(&p, 64, size);
+    return p;
 #else
     return (void *)memalign(64, size);
 #endif
