@@ -64,7 +64,7 @@
 #elif defined (__GNUC__) && !defined (__MINGW32__)
 # include <byteswap.h>
 # define to_be32(x) bswap_32(x)
-#elif defined _WIN64
+#elif defined (_WIN64) || defined (_WIN32)
 # define to_be32(x) _byteswap_ulong(x)
 #endif
 

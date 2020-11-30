@@ -48,7 +48,7 @@
 # define bswap_32(x) OSSwapInt32(x)
 #elif defined (__GNUC__) && !defined (__MINGW32__)
 # include <byteswap.h>
-#elif defined _WIN64
+#elif defined (_WIN64) || defined (_WIN32)
 # define bswap_32(x) _byteswap_ulong(x)
 #endif
 
