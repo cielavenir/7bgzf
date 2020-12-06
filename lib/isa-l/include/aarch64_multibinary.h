@@ -31,7 +31,7 @@
 #ifndef __aarch64__
 #error "This file is for aarch64 only"
 #endif
-#ifndef __MACH__
+#ifndef __APPLE__
 #include <asm/hwcap.h>
 #define cdecl(s) s
 #else
@@ -57,12 +57,12 @@
 	.data
 	.balign 8
 	.global cdecl(\name\()_dispatcher_info)
-#ifndef __MACH__
+#ifndef __APPLE__
 	.type   \name\()_dispatcher_info,%object
 #endif
 	cdecl(\name\()_dispatcher_info):
 		.quad   \name\()_mbinit         //func_entry
-#ifndef __MACH__
+#ifndef __APPLE__
 	.size   \name\()_dispatcher_info,. - \name\()_dispatcher_info
 #endif
 	.balign 8
@@ -157,12 +157,12 @@
 		.cfi_endproc
 
 	.global cdecl(\name)
-#ifndef __MACH__
+#ifndef __APPLE__
 	.type \name,%function
 #endif
 	.align  2
 	cdecl(\name\()):
-#ifndef __MACH__
+#ifndef __APPLE__
 		adrp    x9, :got:\name\()_dispatcher_info
 		ldr     x9, [x9, #:got_lo12:\name\()_dispatcher_info]
 #else
@@ -171,7 +171,7 @@
 #endif
 		ldr     x10,[x9]
 		br      x10
-#ifndef __MACH__
+#ifndef __APPLE__
 	.size \name,. - \name
 #endif
 .endm
@@ -185,23 +185,23 @@
 	.data
 	.balign 8
 	.global cdecl(\name\()_dispatcher_info)
-#ifndef __MACH__
+#ifndef __APPLE__
 	.type   \name\()_dispatcher_info,%object
 #endif
 	cdecl(\name\()_dispatcher_info):
 		.quad   \base         //func_entry
-#ifndef __MACH__
+#ifndef __APPLE__
 	.size   \name\()_dispatcher_info,. - \name\()_dispatcher_info
 #endif
 	.balign 8
 	.text
 	.global cdecl(\name)
-#ifndef __MACH__
+#ifndef __APPLE__
 	.type \name,%function
 #endif
 	.align  2
 	cdecl(\name\()):
-#ifndef __MACH__
+#ifndef __APPLE__
 		adrp    x9, :got:cdecl(_\name\()_dispatcher_info)
 		ldr     x9, [x9, #:got_lo12:cdecl(_\name\()_dispatcher_info)]
 #else
@@ -210,15 +210,36 @@
 #endif
 		ldr     x10,[x9]
 		br      x10
-#ifndef __MACH__
+#ifndef __APPLE__
 	.size \name,. - \name
 #endif
 .endm
 
 #else /* __ASSEMBLY__ */
 #include <stdint.h>
-#ifndef __MACH__
+#if defined(__linux__)
 #include <sys/auxv.h>
+#elif defined(__APPLE__)
+int _get_cpu_capabilities(void);
+#define kHasICDSBShift                  2
+#define kHasICDSB                       0x00000004      // ICache Data Syncronization on DSB enabled (H13)
+#define kHasNeonFP16                    0x00000008      // ARM v8.2 NEON FP16 supported
+#define kCache32                        0x00000010      // cache line size is 32 bytes
+#define kCache64                        0x00000020      // cache line size is 64 bytes
+#define kCache128                       0x00000040      // cache line size is 128 bytes
+#define kFastThreadLocalStorage         0x00000080      // TLS ptr is kept in a user-mode-readable register
+#define kHasNeon                        0x00000100      // Advanced SIMD is supported
+#define kHasNeonHPFP                    0x00000200      // Advanced SIMD half-precision
+#define kHasVfp                         0x00000400      // VFP is supported
+#define kHasUCNormalMemory              0x00000800      // Uncacheable normal memory type supported
+#define kHasEvent                       0x00001000      // WFE/SVE and period event wakeup
+#define kHasFMA                         0x00002000      // Fused multiply add is supported
+#define kHasARMv82FHM                   0x00004000      // Optional ARMv8.2 FMLAL/FMLSL instructions (required in ARMv8.4)
+#define kUP                             0x00008000      // set if (kNumCPUs == 1)
+#define kNumCPUs                        0x00FF0000      // number of CPUs (see _NumCPUs() below)
+#define kHasARMv8Crypto                 0x01000000      // Optional ARMv8 Crypto extensions
+#define kHasARMv81Atomics               0x02000000      // ARMv8.1 Atomic instructions supported
+#define kHasARMv8Crc32                  0x04000000      // Optional ARMv8 crc32 instructions (required in ARMv8.1)
 #endif
 
 
@@ -318,14 +339,13 @@
  *   won't be as expected.
  *
  * References:
- #ifdef __MACH__ -  [CPU Feature detection](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/arm64/cpu-feature-registers.rst?h=v5.5)
- #endif*
- 
+ * -  [CPU Feature detection](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/arm64/cpu-feature-registers.rst?h=v5.5)
+ *
  */
 static inline uint32_t get_micro_arch_id(void)
 {
 	uint32_t id=CPU_IMPLEMENTER_RESERVE;
-#ifndef __MACH__
+#ifndef __APPLE__
 	if ((getauxval(AT_HWCAP) & HWCAP_CPUID)) {
 		/** Here will trap into kernel space */
 		asm("mrs %0, MIDR_EL1 " : "=r" (id));

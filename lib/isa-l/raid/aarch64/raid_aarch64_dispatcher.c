@@ -30,11 +30,13 @@
 
 DEFINE_INTERFACE_DISPATCHER(xor_gen)
 {
-#ifndef __MACH__
+#if defined(__linux__)
 	if (getauxval(AT_HWCAP) & HWCAP_ASIMD)
 		return PROVIDER_INFO(xor_gen_neon);
-#elif defined(__aarch64__)
-	return PROVIDER_INFO(xor_gen_neon);
+#elif defined(__APPLE__)
+	int features = _get_cpu_capabilities();
+	if (features & kHasNeon)
+		return PROVIDER_INFO(xor_gen_neon);
 #endif
 	return PROVIDER_BASIC(xor_gen);
 
@@ -42,11 +44,13 @@ DEFINE_INTERFACE_DISPATCHER(xor_gen)
 
 DEFINE_INTERFACE_DISPATCHER(xor_check)
 {
-#ifndef __MACH__
+#if defined(__linux__)
 	if (getauxval(AT_HWCAP) & HWCAP_ASIMD)
 		return PROVIDER_INFO(xor_check_neon);
-#elif defined(__aarch64__)
-	return PROVIDER_INFO(xor_check_neon);
+#elif defined(__APPLE__)
+	int features = _get_cpu_capabilities();
+	if (features & kHasNeon)
+		return PROVIDER_INFO(xor_check_neon);
 #endif
 	return PROVIDER_BASIC(xor_check);
 
@@ -54,11 +58,13 @@ DEFINE_INTERFACE_DISPATCHER(xor_check)
 
 DEFINE_INTERFACE_DISPATCHER(pq_gen)
 {
-#ifndef __MACH__
+#if defined(__linux__)
 	if (getauxval(AT_HWCAP) & HWCAP_ASIMD)
 		return PROVIDER_INFO(pq_gen_neon);
-#elif defined(__aarch64__)
-	return PROVIDER_INFO(pq_gen_neon);
+#elif defined(__APPLE__)
+	int features = _get_cpu_capabilities();
+	if (features & kHasNeon)
+		return PROVIDER_INFO(pq_gen_neon);
 #endif
 	return PROVIDER_BASIC(pq_gen);
 
@@ -66,11 +72,13 @@ DEFINE_INTERFACE_DISPATCHER(pq_gen)
 
 DEFINE_INTERFACE_DISPATCHER(pq_check)
 {
-#ifndef __MACH__
+#if defined(__linux__)
 	if (getauxval(AT_HWCAP) & HWCAP_ASIMD)
 		return PROVIDER_INFO(pq_check_neon);
-#elif defined(__aarch64__)
-	return PROVIDER_INFO(pq_check_neon);
+#elif defined(__APPLE__)
+	int features = _get_cpu_capabilities();
+	if (features & kHasNeon)
+		return PROVIDER_INFO(pq_check_neon);
 #endif
 	return PROVIDER_BASIC(pq_check);
 

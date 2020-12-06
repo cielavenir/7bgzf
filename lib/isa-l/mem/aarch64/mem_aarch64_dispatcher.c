@@ -30,13 +30,14 @@
 
 DEFINE_INTERFACE_DISPATCHER(isal_zero_detect)
 {
-#ifndef __MACH__
+#if defined(__linux__)
 	unsigned long auxval = getauxval(AT_HWCAP);
 	if (auxval & HWCAP_ASIMD)
 		return PROVIDER_INFO(mem_zero_detect_neon);
-#elif defined(__aarch64__)
-	return PROVIDER_INFO(mem_zero_detect_neon);
-#else
-	return PROVIDER_BASIC(mem_zero_detect);
+#elif defined(__APPLE__)
+	int features = _get_cpu_capabilities();
+	if (features & kHasNeon)
+		return PROVIDER_INFO(mem_zero_detect_neon);
 #endif
+	return PROVIDER_BASIC(mem_zero_detect);
 }
