@@ -867,6 +867,7 @@ int lzmaOpen7z(){
 	if(!h7z)h7z=LoadLibraryA("7z32.dll"); // lol...
 #else
 	if(!h7z)h7z=LoadLibraryA("/usr/local/opt/p7zip/lib/p7zip/7z.so"); //Homebrew
+	if(!h7z)h7z=LoadLibraryA("/opt/homebrew/opt/p7zip/lib/p7zip/7z.so");
 	if(!h7z)h7z=LoadLibraryA("/opt/local/lib/p7zip/7z.so"); //MacPorts
 	if(!h7z)h7z=LoadLibraryA("/sw/lib/p7zip/7z.so"); //Fink
 	if(!h7z)h7z=LoadLibraryA("/home/linuxbrew/.linuxbrew/lib/p7zip/7z.so");
