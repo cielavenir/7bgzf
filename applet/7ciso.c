@@ -334,7 +334,7 @@ int _7ciso(const int argc, const char **argv){
 			case 'l':{
 				char *arg=poptGetOptArg(optCon);
 				if(arg)libdeflate=strtol(arg,NULL,10),free(arg);
-				else libdeflate=1;
+				else libdeflate=6;
 				break;
 			}
 			case 'S':{
