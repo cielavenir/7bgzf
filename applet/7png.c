@@ -39,6 +39,7 @@ void write32(void *p, const unsigned int n){
 #endif
 
 #include "../lib/lzma.h"
+#include "../lib/isa-l/include/igzip_lib.h"
 #include "../lib/popt/popt.h"
 
 #ifdef NOTIMEOFDAY
@@ -66,6 +67,7 @@ static int _compress(FILE *in, FILE *out, int level, int method, bool strip){
 	bool cgbi=false;
 	unsigned int cgbiflg=0;
 	int bits=0,color=0,filter=0,width=0,height=0;
+	filter; height; //avoid warn
 
 	int tbl_last=0;
 	size_t compsize=0;
@@ -91,6 +93,7 @@ static int _compress(FILE *in, FILE *out, int level, int method, bool strip){
 			size_t bufsize=compsize + (compsize>>1);
 
 			int declen=0;
+#if defined(NOIGZIP)
 			{
 				z_stream z;
 
@@ -128,6 +131,31 @@ static int _compress(FILE *in, FILE *out, int level, int method, bool strip){
 					return 2;
 				}
 			}
+#else
+			{
+				struct inflate_state z;
+				isal_inflate_init(&z);
+				z.crc_flag = cgbi ? 0 : ISAL_ZLIB;
+
+				int i=0;
+				for(;i<tbl_last;i++){
+					z.next_in = tbl[i];
+					z.avail_in = tbl_size[i];
+					for(;(i==tbl_last-1||z.avail_in);){
+						z.next_out = buf;
+						z.avail_out = BUFLEN;
+
+					    int status = isal_inflate(&z);
+					    if(status != Z_OK){
+						    fprintf(stderr,"inflate: %d\n", status);
+						    return 10;
+					    }
+						declen+=BUFLEN-z.avail_out;
+						if(z.block_state == ISAL_BLOCK_FINISH)break;
+					}
+				}
+			}
+#endif
 
 			fprintf(stderr,"decode length=%d\n",declen);
 			unsigned char* __decompbuf=(unsigned char*)malloc(declen);
@@ -136,6 +164,7 @@ static int _compress(FILE *in, FILE *out, int level, int method, bool strip){
 				return -1;
 			}
 
+#if defined(NOIGZIP)
 			{
 				z_stream z;
 
@@ -170,7 +199,28 @@ static int _compress(FILE *in, FILE *out, int level, int method, bool strip){
 					return 2;
 				}
 			}
+#else
+			{
+				struct inflate_state z;
+				isal_inflate_init(&z);
+				z.crc_flag = cgbi ? 0 : ISAL_ZLIB;
 
+				int i=0;
+				z.next_out = __decompbuf;
+				z.avail_out = declen;
+				for(;i<tbl_last;i++){
+					z.next_in = tbl[i];
+					z.avail_in = tbl_size[i];
+
+					int status = isal_inflate(&z);
+					if(status != Z_OK){
+						fprintf(stderr,"inflate: %d\n", status);
+						return 10;
+					}
+					free(tbl[i]);
+				}
+			}
+#endif
 			if(cgbi&&cgbiflg){
 				int i=1,j=0;
 				if(color==6){ //RGBA
