@@ -35,9 +35,7 @@ DEFINE_INTERFACE_DISPATCHER(isal_zero_detect)
 	if (auxval & HWCAP_ASIMD)
 		return PROVIDER_INFO(mem_zero_detect_neon);
 #elif defined(__APPLE__)
-	int features = _get_cpu_capabilities();
-	if (features & kHasNeon)
-		return PROVIDER_INFO(mem_zero_detect_neon);
+	return PROVIDER_INFO(mem_zero_detect_neon);
 #endif
 	return PROVIDER_BASIC(mem_zero_detect);
 }
