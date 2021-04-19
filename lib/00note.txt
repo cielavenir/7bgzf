@@ -4,5 +4,5 @@ zopfli     1.0.3/bd64b2f  191128
 miniz      2.1.0/a426483  190506
 slz        1.2.0/ff53715  200216
 libdeflate 1.7/448e3f3    201109
-zlib-ng    1.9.9-b1/b55680b 200925
+zlib-ng    2.0.2/5fe2590  210324
 isa-l      2.30.0/2df39cf 201106

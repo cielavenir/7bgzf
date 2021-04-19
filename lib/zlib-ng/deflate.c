@@ -215,7 +215,7 @@ Z_INTERNAL void slide_hash_c(deflate_state *s) {
         Pos *q = p - n;
         for (i = 0; i < n; i++) {
             Pos m = *q;
-            Pos t = wsize;
+            Pos t = (Pos)wsize;
             *q++ = (Pos)(m >= t ? m-t: 0);
         }
     }
@@ -238,7 +238,7 @@ Z_INTERNAL void slide_hash_c(deflate_state *s) {
         Pos *q = p - n;
         for (i = 0; i < n; i++) {
             Pos m = *q;
-            Pos t = wsize;
+            Pos t = (Pos)wsize;
             *q++ = (Pos)(m >= t ? m-t: 0);
         }
     }
@@ -1201,11 +1201,17 @@ void check_match(deflate_state *s, Pos start, Pos match, int length) {
         fprintf(stderr, " start %u, match %u, length %d\n", start, match, length);
         z_error("invalid match length");
     }
+    /* check that the match isn't at the same position as the start string */
+    if (match == start) {
+        fprintf(stderr, " start %u, match %u, length %d\n", start, match, length);
+        z_error("invalid match position");
+    }
     /* check that the match is indeed a match */
     if (memcmp(s->window + match, s->window + start, length) != EQUAL) {
+        int32_t i = 0;
         fprintf(stderr, " start %u, match %u, length %d\n", start, match, length);
         do {
-            fprintf(stderr, "%c%c", s->window[match++], s->window[start++]);
+            fprintf(stderr, "  %03d: match [%02x] start [%02x]\n", i++, s->window[match++], s->window[start++]);
         } while (--length != 0);
         z_error("invalid match");
     }
@@ -1246,7 +1252,12 @@ void Z_INTERNAL fill_window(deflate_state *s) {
          */
         if (s->strstart >= wsize+MAX_DIST(s)) {
             memcpy(s->window, s->window+wsize, (unsigned)wsize);
-            s->match_start = (s->match_start >= wsize) ? s->match_start - wsize : 0;
+            if (s->match_start >= wsize) {
+                s->match_start -= wsize;
+            } else {
+                s->match_start = 0;
+                s->prev_length = 0;
+            }
             s->strstart    -= wsize; /* we now have strstart >= MAX_DIST */
             s->block_start -= (int)wsize;
             if (s->insert > s->strstart)
