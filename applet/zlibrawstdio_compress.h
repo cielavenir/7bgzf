@@ -212,8 +212,9 @@ static int _compress(FILE *fin,FILE *fout,int level,int method){
 #endif
 	}
 
+	// the mmap logic is from https://github.com/ebiggers/libdeflate/blob/master/programs/prog_util.c
 	if(method==DEFLATE_LIBDEFLATE){
-		long long siz = filelengthi64(fileno(stdin));
+		long long siz = filelengthi64(fileno(fin));
 		if(!siz){
 			fprintf(stderr,"empty file is not supported (possibly stdinasfile is required)\n");
 			return 1;
@@ -256,7 +257,7 @@ static int _compress(FILE *fin,FILE *fout,int level,int method){
 	}
 
 	if(method==DEFLATE_ZOPFLI){
-		long long siz = filelengthi64(fileno(stdin));
+		long long siz = filelengthi64(fileno(fin));
 		if(!siz){
 			fprintf(stderr,"empty file is not supported (possibly stdinasfile is required)\n");
 			return 1;
