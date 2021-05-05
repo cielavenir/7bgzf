@@ -26,6 +26,16 @@
  */
 
 #include "cpu_features.h"
+#if __INTEL_COMPILER
+typedef unsigned int __v4su __attribute__ ((__vector_size__ (16)));
+typedef unsigned int __v8su __attribute__ ((__vector_size__ (32)));
+typedef unsigned short __v16hu __attribute__((__vector_size__(32)));
+typedef unsigned char __v32qu __attribute__((__vector_size__(32)));
+
+typedef int __v16si __attribute__ ((__vector_size__ (64)));
+typedef short __v32hi __attribute__((__vector_size__(64)));
+typedef char __v64qi __attribute__((__vector_size__(64)));
+#endif
 
 /*
  * The following macros horizontally sum the s1 counters and add them to the

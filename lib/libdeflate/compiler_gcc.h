@@ -6,7 +6,8 @@
  * though they maybe can be enabled on some icc versions.
  */
 
-#if !defined(__clang__) && !defined(__INTEL_COMPILER)
+#if !defined(__clang__)
+// && !defined(__INTEL_COMPILER)
 #  define GCC_PREREQ(major, minor)		\
 	(__GNUC__ > (major) ||			\
 	 (__GNUC__ == (major) && __GNUC_MINOR__ >= (minor)))
