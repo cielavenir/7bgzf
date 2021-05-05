@@ -160,16 +160,37 @@ __attribute__((noreturn)) static void usage(){
 	"other"
 #endif
 	;
+
+	const char *compiler=
+#if defined(__INTEL_COMPILER)
+	" [icc]"
+#elif defined(__OPENCC__)
+	" [opencc]"
+#elif defined(__BORLANDC__)
+	" [bcc]"
+#elif defined(_MSC_VER)
+	" [msvc]"
+#elif defined(__clang__)
+	" [clang]"
+#elif defined(__llvm__)
+	" [llvm-gcc]"
+#elif defined(__GNUC__)
+	" [gcc]"
+#else
+	""
+#endif
+	;
+
 	int bits=sizeof(void*)*CHAR_BIT;
 	fprintf(stderr,
-		"CielBox multi-call binary [7bgzf edition] (%s %dbit)\n"
+		"CielBox multi-call binary [7bgzf edition] (%s %dbit%s)\n"
 		"Revision %d (Built on "__DATE__")\n"
 		"cielbox [applet] [arg]\n"
 		"cielbox --list: show list of applets\n"
 		"cielbox --link[-full] /path/to/cielbox\n"
 		"/path/to/cielbox --install: make applet link to cielbox\n"
 		"cielbox --license: show license notice\n"
-	,arch,bits,BOX_REVISION);
+	,arch,bits,compiler,BOX_REVISION);
 
 	exit(-1);//while(1);
 }
