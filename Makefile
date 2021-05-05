@@ -16,6 +16,9 @@ export CXX	:=	$(PREFIX)clang++
 else ifneq ($(OPEN64),)
 export CC       :=      $(PREFIX)opencc
 export CXX      :=      $(PREFIX)openCC
+else ifneq ($(ICC),)
+export CC       :=      $(PREFIX)icc
+export CXX      :=      $(PREFIX)icpc
 else
 export CC	:=	$(PREFIX)gcc
 export CXX	:=	$(PREFIX)g++
