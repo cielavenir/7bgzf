@@ -26,7 +26,7 @@
  */
 
 #include "cpu_features.h"
-#if __INTEL_COMPILER
+#ifdef __INTEL_COMPILER
 typedef unsigned int __v4su __attribute__ ((__vector_size__ (16)));
 typedef unsigned short __v8hu __attribute__((__vector_size__(16)));
 typedef unsigned int __v8su __attribute__ ((__vector_size__ (32)));
