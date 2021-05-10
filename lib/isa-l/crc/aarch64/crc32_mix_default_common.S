@@ -27,11 +27,7 @@
   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 **********************************************************************/
 
-#if defined(__APPLE__)
-	#define cdecl(s) _##s
-#else
-	#define cdecl(s) s
-#endif
+#include "../include/aarch64_label.h"
 
 .macro	declare_generic_reg name:req, reg:req, default:req
 	\name	.req	\default\reg
@@ -217,8 +213,8 @@
 	adrp		x_pconst, lanchor_crc32
 	add		x_buf_tmp, x_buf, 64
 #else
-  adrp		x_pconst, lanchor_crc32@PAGE
-  add		x_buf_tmp, x_buf, 64
+	adrp		x_pconst, lanchor_crc32@PAGE
+ 	add		x_buf_tmp, x_buf, 64
 #endif
 
 	ldr		x_data_crc0, [x_buf, 512]

@@ -27,11 +27,7 @@
   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 **********************************************************************/
 
-#if defined(__APPLE__)
-	#define cdecl(s) _##s
-#else
-	#define cdecl(s) s
-#endif
+#include "../include/aarch64_label.h"
 
 	.arch armv8-a+crc
 	.text
@@ -84,7 +80,7 @@ declare Macros
 #ifndef __APPLE__
         .section        .rodata
 #else
-        .section        __DATA,data
+        .section        __TEXT,__const
 #endif
         .align  4
 .len_to_code_tab_lanchor = . + 0

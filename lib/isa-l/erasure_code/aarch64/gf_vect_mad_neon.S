@@ -26,11 +26,9 @@
   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 **********************************************************************/
-#if defined(__APPLE__)
-	#define cdecl(s) _##s
-#else
-	#define cdecl(s) s
-#endif
+
+#include "../include/aarch64_label.h"
+
 .text
 
 .global cdecl(gf_vect_mad_neon)
@@ -287,7 +285,13 @@ cdecl(gf_vect_mad_neon):
 	mov	x_src, x_src_end
 	sub	x_dest1, x_dest1, x_tmp
 
-	ldr	x_const, =const_tbl
+#ifndef __APPLE__
+	adrp	x_const, const_tbl
+	add	x_const, x_const, :lo12:const_tbl
+#else
+	adrp	x_const, const_tbl@PAGE
+	add	x_const, x_const, const_tbl@PAGEOFF
+#endif
 	sub	x_const, x_const, x_tmp
 	ldr	q_tmp, [x_const, #16]
 
@@ -313,7 +317,11 @@ cdecl(gf_vect_mad_neon):
 	mov	w_ret, #1
 	ret
 
-.data
+#ifndef __APPLE__
+	.section .rodata
+#else
+	.section __TEXT,__const
+#endif
 .balign 8
 const_tbl:
 	.dword 0x0000000000000000, 0x0000000000000000

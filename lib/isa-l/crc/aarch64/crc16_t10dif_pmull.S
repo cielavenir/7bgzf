@@ -27,11 +27,7 @@
 #  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #########################################################################
 
-#if defined(__APPLE__)
-	#define cdecl(s) _##s
-#else
-	#define cdecl(s) s
-#endif
+#include "../include/aarch64_label.h"
 
 	.arch armv8-a+crc+crypto
 	.text
@@ -377,7 +373,7 @@ v_br1			.req	v5
 	.size	crc16_t10dif_pmull, .-crc16_t10dif_pmull
 	.section	.rodata
 #else
-	.section __DATA,data
+	.section	__TEXT,__const
 #endif
 
 	.align	4

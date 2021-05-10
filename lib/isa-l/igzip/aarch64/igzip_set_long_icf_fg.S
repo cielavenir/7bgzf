@@ -27,11 +27,7 @@
   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 **********************************************************************/
 
-#if defined(__APPLE__)
-	#define cdecl(s) _##s
-#else
-	#define cdecl(s) s
-#endif
+#include "../include/aarch64_label.h"
 
 	.arch armv8-a
 	.text
@@ -118,7 +114,7 @@ cdecl(set_long_icf_fg_aarch64):
 	add	x1, x1, :lo12:.data_dist_start
 	mov	x0, dist_start
 #else
-  adrp	x1, .data_dist_start@PAGE
+	adrp	x1, .data_dist_start@PAGE
 	mov	x2, DIST_START_SIZE // 128
 	add	x1, x1, .data_dist_start@PAGEOFF
 	mov	x0, dist_start
@@ -202,7 +198,7 @@ cdecl(set_long_icf_fg_aarch64):
 	.size	set_long_icf_fg_aarch64, .-set_long_icf_fg_aarch64
 	.section	.rodata
 #else
-  .section __DATA,data
+	.section	__TEXT,__const
 #endif
 	.align	3
 	.set	.data_dist_start,. + 0

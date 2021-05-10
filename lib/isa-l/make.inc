@@ -173,9 +173,10 @@ $(all_perf_tests): % : %.c $(lib_name)
 $(sort $(notdir $(examples))): % : %.c $(lib_name)
 $(sort $(notdir $(other_tests))): % : %.c $(lib_name)
 
-$(all_llvm_fuzz_tests): FUZZLINK = -lFuzzer
-$(all_llvm_fuzz_tests): CFLAGS += -fsanitize-coverage=trace-pc-guard -fsanitize=address
-$(all_llvm_fuzz_tests): CXXFLAGS += -fsanitize-coverage=trace-pc-guard -fsanitize=address
+fuzz_args = -fsanitize=fuzzer,address
+$(all_llvm_fuzz_tests): FUZZLINK =  $(fuzz_args)
+$(all_llvm_fuzz_tests): CFLAGS   += $(fuzz_args)
+$(all_llvm_fuzz_tests): CXXFLAGS += $(fuzz_args)
 $(all_llvm_fuzz_tests): % : %.o $(lib_name)
 	$(CXX) $(CXXFLAGS)  $^ $(LDLIBS) $(FUZZLINK) -o $@
 
@@ -201,7 +202,7 @@ ASFLAGS += -DAS_FEATURE_LEVEL=$(as_feature_level) $(D_HAVE_AS_KNOWS_AVX512_y)
 
 
 # Check for pthreads
-have_threads ?= $(shell printf "\#include <pthread.h>\nint main(void){return 0;}\n" | $(CC) -x c - -o /dev/null -lpthread && echo y )
+have_threads ?= $(shell printf "int main(void){return 0;}\n" | $(CC) -x c - -o /dev/null -lpthread && echo y )
 THREAD_LD_$(have_threads) := -lpthread
 THREAD_CFLAGS_$(have_threads) := -DHAVE_THREADS
 
@@ -386,3 +387,4 @@ doc: isa-l.h
 	(cat Doxyfile; echo 'PROJECT_NUMBER=$(version)') | doxygen -
 	$(MAKE) -C generated_doc/latex &> generated_doc/latex_build_api.log
 	cp generated_doc/latex/refman.pdf isa-l_api_$(version).pdf
+

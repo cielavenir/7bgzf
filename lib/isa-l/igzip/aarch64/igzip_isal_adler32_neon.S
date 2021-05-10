@@ -27,11 +27,7 @@
   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 **********************************************************************/
 
-#if defined(__APPLE__)
-	#define cdecl(s) _##s
-#else
-	#define cdecl(s) s
-#endif
+#include "../include/aarch64_label.h"
 
 	.arch armv8-a+crypto
 	.text
@@ -107,8 +103,8 @@ local variables
 	adrp 	x3,factors
 	add  	x3,x3,:lo12:factors
 #else
-  adrp 	x3,factors@PAGE
-  add  	x3,x3,factors@PAGEOFF
+	adrp 	x3,factors@PAGE
+	add  	x3,x3,factors@PAGEOFF
 #endif
 	ld1 	{factor0_v.16b-factor1_v.16b},[x3]
 
@@ -185,7 +181,7 @@ end_func:
 	.size	adler32_neon, .-adler32_neon
 	.section	.rodata.cst16,"aM",@progbits,16
 #else
-  .section __DATA,data
+	.section	__TEXT,__const
 #endif
 	.align	4
 factors:

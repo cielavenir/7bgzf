@@ -27,11 +27,7 @@
   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 **********************************************************************/
 
-#if defined(__APPLE__)
-	#define cdecl(s) _##s
-#else
-	#define cdecl(s) s
-#endif
+#include "../include/aarch64_label.h"
 
 	.arch armv8-a
 	.text
@@ -336,14 +332,13 @@ cdecl(decode_huffman_code_block_stateless_aarch64):
 	adrp	rfc_table,rfc_lookup_table
 	add	rfc_table,rfc_table,:lo12:rfc_lookup_table
 #else
-  adrp	rfc_table,rfc_lookup_table@PAGE
+	adrp	rfc_table,rfc_lookup_table@PAGE
 	add	rfc_table,rfc_table,rfc_lookup_table@PAGEOFF
 #endif
 #if ENABLE_TBL_INSTRUCTION
 	ld1	{v1.16b,v2.16b,v3.16b},[rfc_table]
 	add	rfc_table,rfc_table,48
 	ld1	{v4.16b-v7.16b},[rfc_table]
-
 #endif
 
 	/*
