@@ -229,24 +229,30 @@ static int _compress(FILE *fin,FILE *fout,int level,int method){
 			fprintf(stderr,"failed mmap\n");
 			return 1;
 		}
-		struct libdeflate_compressor *c = libdeflate_alloc_compressor(level);
-		long long maxcompsize = libdeflate_deflate_compress_bound(c, siz);
+		long long maxcompsize = libdeflate_deflate_compress_bound(NULL, siz) + 18;
 		char *compdata = malloc(maxcompsize);
+
 		{
-			writeHeader(fout);
-			long long actualcompsize = libdeflate_deflate_compress(c, mem, siz, compdata, maxcompsize);
-			fwrite(compdata, 1, actualcompsize, fout);
+			zlibutil_buffer zlibbuf;
+			memset(&zlibbuf, 0, sizeof(zlibutil_buffer));
+			zlibbuf.dest = compdata;
+			zlibbuf.destLen = maxcompsize;
+			zlibbuf.source = mem;
+			zlibbuf.sourceLen = siz;
+			zlibbuf.encode = 1;
+			zlibbuf.level = level;
+			zlibbuf.func = libdeflate_deflate;
 #if defined(ZLIBRAWSTDIO_COMPRESS_DEFLATE)
-			unsigned crc=0;
 #elif defined(ZLIBRAWSTDIO_COMPRESS_ZLIB)
-			unsigned crc=adler32(1,mem,siz);
+			zlibbuf.rfc1950 = 1;
 #elif defined(ZLIBRAWSTDIO_COMPRESS_GZIP)
-			unsigned crc=crc32(0,mem,siz);
+			zlibbuf.rfc1952 = 1;
 #endif
-			writeTrailer(fout,crc,siz);
+			zlibutil_buffer_code(&zlibbuf);
+			fwrite(zlibbuf.dest, 1, zlibbuf.destLen, fout);
 			fflush(fout);
 		}
-		libdeflate_free_compressor(c);
+		free(compdata);
 #if defined(_WIN32) || (!defined(__GNUC__) && !defined(__clang__))
 		UnmapViewOfFile(mem);
 		CloseHandle(h);
@@ -272,26 +278,30 @@ static int _compress(FILE *fin,FILE *fout,int level,int method){
 			fprintf(stderr,"failed mmap\n");
 			return 1;
 		}
+		long long maxcompsize = libdeflate_deflate_compress_bound(NULL, siz) + 18;
+		char *compdata = malloc(maxcompsize);
+
 		{
-			writeHeader(fout);
-			ZopfliOptions options;
-			ZopfliInitOptions(&options);
-			options.numiterations=level;
-			size_t actualcompsize=0;
-			unsigned char bp=0;
-			unsigned char *compdata=NULL;
-			ZopfliDeflate(&options, 2 /* Dynamic block */, 1, mem, siz, &bp, &compdata, &actualcompsize);
-			fwrite(compdata, 1, actualcompsize, fout);
+			zlibutil_buffer zlibbuf;
+			memset(&zlibbuf, 0, sizeof(zlibutil_buffer));
+			zlibbuf.dest = compdata;
+			zlibbuf.destLen = maxcompsize;
+			zlibbuf.source = mem;
+			zlibbuf.sourceLen = siz;
+			zlibbuf.encode = 1;
+			zlibbuf.level = level;
+			zlibbuf.func = zopfli_deflate;
 #if defined(ZLIBRAWSTDIO_COMPRESS_DEFLATE)
-			unsigned crc=0;
 #elif defined(ZLIBRAWSTDIO_COMPRESS_ZLIB)
-			unsigned crc=adler32(1,mem,siz);
+			zlibbuf.rfc1950 = 1;
 #elif defined(ZLIBRAWSTDIO_COMPRESS_GZIP)
-			unsigned crc=crc32(0,mem,siz);
+			zlibbuf.rfc1952 = 1;
 #endif
-			writeTrailer(fout,crc,siz);
+			zlibutil_buffer_code(&zlibbuf);
+			fwrite(zlibbuf.dest, 1, zlibbuf.destLen, fout);
 			fflush(fout);
 		}
+		free(compdata);
 #if defined(_WIN32) || (!defined(__GNUC__) && !defined(__clang__))
 		UnmapViewOfFile(mem);
 		CloseHandle(h);
@@ -301,62 +311,114 @@ static int _compress(FILE *fin,FILE *fout,int level,int method){
 		return 0;
 	}
 
-	z_stream z;
-	int status;
-	int flush=Z_NO_FLUSH;
-	//long long filesize=filelengthi64(fileno(fin));
+	if(method==DEFLATE_KZIP){
+		long long siz = filelengthi64(fileno(fin));
+		if(!siz){
+			fprintf(stderr,"empty file is not supported (possibly stdinasfile is required)\n");
+			return 1;
+		}
+#if defined(_WIN32) || (!defined(__GNUC__) && !defined(__clang__))
+		HANDLE *h = CreateFileMapping(_get_osfhandle(fileno(fin)), NULL, PAGE_READONLY, 0, 0, NULL);
+		char *mem = MapViewOfFile(h, FILE_MAP_READ, 0, 0, siz);
+#else
+		char *mem = mmap(NULL, siz, PROT_READ, MAP_SHARED, fileno(fin), 0);
+#endif
+		if(!mem){
+			fprintf(stderr,"failed mmap\n");
+			return 1;
+		}
+		long long maxcompsize = libdeflate_deflate_compress_bound(NULL, siz) + 18;
+		char *compdata = malloc(maxcompsize);
 
-	z.zalloc = Z_NULL;
-	z.zfree = Z_NULL;
-	z.opaque = Z_NULL;
-
-	if(deflateInit2(&z,level,Z_DEFLATED, MAX_WBITS+16, 9, Z_DEFAULT_STRATEGY) != Z_OK){
-		fprintf(stderr,"deflateInit: %s\n", (z.msg) ? z.msg : "???");
-		return 1;
+		{
+			zlibutil_buffer zlibbuf;
+			memset(&zlibbuf, 0, sizeof(zlibutil_buffer));
+			zlibbuf.dest = compdata;
+			zlibbuf.destLen = maxcompsize;
+			zlibbuf.source = mem;
+			zlibbuf.sourceLen = siz;
+			zlibbuf.encode = 1;
+			zlibbuf.level = level;
+			zlibbuf.func = kzip_deflate;
+#if defined(ZLIBRAWSTDIO_COMPRESS_DEFLATE)
+#elif defined(ZLIBRAWSTDIO_COMPRESS_ZLIB)
+			zlibbuf.rfc1950 = 1;
+#elif defined(ZLIBRAWSTDIO_COMPRESS_GZIP)
+			zlibbuf.rfc1952 = 1;
+#endif
+			zlibutil_buffer_code(&zlibbuf);
+			fwrite(zlibbuf.dest, 1, zlibbuf.destLen, fout);
+			fflush(fout);
+		}
+		free(compdata);
+#if defined(_WIN32) || (!defined(__GNUC__) && !defined(__clang__))
+		UnmapViewOfFile(mem);
+		CloseHandle(h);
+#else
+		munmap(mem, siz);
+#endif
+		return 0;
 	}
+	
+	if(method==DEFLATE_ZLIB){
+		z_stream z;
+		int status;
+		int flush=Z_NO_FLUSH;
+		//long long filesize=filelengthi64(fileno(fin));
 
-	z.next_in = __decompbuf;
-	z.avail_in = fread(__decompbuf,1,DECOMPBUFLEN,fin);
-	z.next_out = __compbuf;
-	z.avail_out = COMPBUFLEN;
-	if(z.avail_in < DECOMPBUFLEN)flush=Z_FINISH;
+		z.zalloc = Z_NULL;
+		z.zfree = Z_NULL;
+		z.opaque = Z_NULL;
 
-	for(;;){
-		status = deflate(&z, flush);
-		if(status == Z_STREAM_END)break;
-		if(status != Z_OK){
-			fprintf(stderr,"deflate: %s\n", (z.msg) ? z.msg : "???");
-			return 10;
+		if(deflateInit2(&z,level,Z_DEFLATED, MAX_WBITS+16, 9, Z_DEFAULT_STRATEGY) != Z_OK){
+			fprintf(stderr,"deflateInit: %s\n", (z.msg) ? z.msg : "???");
+			return 1;
 		}
 
-		//goto next buffer
-		if(z.avail_in == 0){
-			//if(flush==Z_FINISH){fprintf(stderr,"failed to complete deflation.\n");return 11;}
-			z.next_in = __decompbuf;
-			z.avail_in = fread(__decompbuf,1,DECOMPBUFLEN,fin);
-			if(z.avail_in < DECOMPBUFLEN)flush=Z_FINISH;
-		}
-		if(z.avail_out == 0){
-			fwrite(__compbuf,1,COMPBUFLEN,fout);
-			z.next_out = __compbuf;
-			z.avail_out = COMPBUFLEN;
-		}
-	}
-	fwrite(__compbuf,1,COMPBUFLEN-z.avail_out,fout);
+		z.next_in = __decompbuf;
+		z.avail_in = fread(__decompbuf,1,DECOMPBUFLEN,fin);
+		z.next_out = __compbuf;
+		z.avail_out = COMPBUFLEN;
+		if(z.avail_in < DECOMPBUFLEN)flush=Z_FINISH;
 
-	if(deflateEnd(&z) != Z_OK){
-		fprintf(stderr,"deflateEnd: %s\n", (z.msg) ? z.msg : "???");
-		return 2;
+		for(;;){
+			status = deflate(&z, flush);
+			if(status == Z_STREAM_END)break;
+			if(status != Z_OK){
+				fprintf(stderr,"deflate: %s\n", (z.msg) ? z.msg : "???");
+				return 10;
+			}
+
+			//goto next buffer
+			if(z.avail_in == 0){
+				//if(flush==Z_FINISH){fprintf(stderr,"failed to complete deflation.\n");return 11;}
+				z.next_in = __decompbuf;
+				z.avail_in = fread(__decompbuf,1,DECOMPBUFLEN,fin);
+				if(z.avail_in < DECOMPBUFLEN)flush=Z_FINISH;
+			}
+			if(z.avail_out == 0){
+				fwrite(__compbuf,1,COMPBUFLEN,fout);
+				z.next_out = __compbuf;
+				z.avail_out = COMPBUFLEN;
+			}
+		}
+		fwrite(__compbuf,1,COMPBUFLEN-z.avail_out,fout);
+
+		if(deflateEnd(&z) != Z_OK){
+			fprintf(stderr,"deflateEnd: %s\n", (z.msg) ? z.msg : "???");
+			return 2;
+		}
+		return 0;
 	}
 
-	return 0;
+	return -1;
 }
 
 static int _decompress(FILE *fin,FILE *fout);
 
 static int zlibrawstdio_main(const int argc, const char **argv){
 	int cmode=0,mode=0;
-	int zlib=0,sevenzip=0,zopfli=0,miniz=0,slz=0,libdeflate=0,zlibng=0,igzip=0,cryptopp=0;
+	int zlib=0,sevenzip=0,zopfli=0,miniz=0,slz=0,libdeflate=0,zlibng=0,igzip=0,cryptopp=0,kzip=0;
 	//int nthreads=1;
 	//int bsize=0;
 	poptContext optCon;
@@ -366,9 +428,14 @@ static int zlibrawstdio_main(const int argc, const char **argv){
 		//{ "longname", "shortname", argInfo,      *arg,       int val, description, argment description}
 		{ "stdout", 'c',         POPT_ARG_NONE,            &cmode,      0,       "stdout (currently ignored; always output to stdout)", NULL },
 		{ "zlib",   'z',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,       'z',     "1-9 (default 6) zlib", "level" },
-		{ "7zip",     'S',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,    'S',       "1-9 (default 2) 7zip", "level" },
+		//{ "miniz",     'm',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,    'm',       "1-9 (default 1) miniz", "level" },
+		//{ "slz",     's',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,    's',       "1-1 (default 1) slz", "level" },
 		{ "libdeflate",   'l',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,       'l',     "1-12 (default 6) libdeflate", "level" },
+		{ "7zip",     'S',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,    'S',       "1-9 (default 2) 7zip", "level" },
+		//{ "zlibng",     'n',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,    'n',       "1-9 (default 6) zlibng", "level" },
+		//{ "cryptopp",     'C',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,    'C',       "1-9 (default 6) cryptopp", "level" },
 		{ "igzip",   'i',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,       'i',     "1-4 (default 1) igzip (1 becomes igzip internal level 0, 2 becomes 1, ...)", "level" },
+		{ "kzip",     'K',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,    'K',       "1-1 (default 1) kzip", "level" },
 		{ "zopfli",     'Z',         POPT_ARG_INT, &zopfli,    0,       "zopfli", "numiterations" },
 		//{ "threshold",  't',         POPT_ARG_INT, &threshold, 0,       "compression threshold (in %, 10-100)", "threshold" },
 		{ "decompress", 'd',         POPT_ARG_NONE,            &mode,      0,       "decompress", NULL },
@@ -428,15 +495,21 @@ static int zlibrawstdio_main(const int argc, const char **argv){
 				else igzip=1;
 				break;
 			}
+			case 'K':{
+				char *arg=poptGetOptArg(optCon);
+				if(arg)kzip=strtol(arg,NULL,10),free(arg);
+				else kzip=1;
+				break;
+			}
 		}
 	}
 
-	int level_sum=zlib+sevenzip+zopfli+miniz+slz+libdeflate+zlibng+igzip+cryptopp;
+	int level_sum=zlib+sevenzip+zopfli+miniz+slz+libdeflate+zlibng+igzip+cryptopp+kzip;
 	if(
 		optc<-1 ||
-		(!mode&&!zlib&&!sevenzip&&!zopfli&&!miniz&&!slz&&!libdeflate&&!zlibng&&!igzip&&!cryptopp) ||
-		(mode&&(zlib||sevenzip||zopfli||miniz||slz||libdeflate||zlibng||igzip||cryptopp)) ||
-		(!mode&&(level_sum==zlib)+(level_sum==sevenzip)+(level_sum==zopfli)+(level_sum==miniz)+(level_sum==slz)+(level_sum==libdeflate)+(level_sum==zlibng)+(level_sum==igzip)+(level_sum==cryptopp)!=1)
+		(!mode&&!zlib&&!sevenzip&&!zopfli&&!miniz&&!slz&&!libdeflate&&!zlibng&&!igzip&&!cryptopp&&!kzip) ||
+		(mode&&(zlib||sevenzip||zopfli||miniz||slz||libdeflate||zlibng||igzip||cryptopp||kzip)) ||
+		(!mode&&(level_sum==zlib)+(level_sum==sevenzip)+(level_sum==zopfli)+(level_sum==miniz)+(level_sum==slz)+(level_sum==libdeflate)+(level_sum==zlibng)+(level_sum==igzip)+(level_sum==cryptopp)+(level_sum==kzip)!=1)
 	){
 		poptPrintHelp(optCon, stderr, 0);
 		poptFreeContext(optCon);
@@ -499,6 +572,9 @@ static int zlibrawstdio_main(const int argc, const char **argv){
 		}else if(zopfli){
 			fprintf(stderr,"(zopfli)\n");
 			ret=_compress(stdin,stdout,zopfli,DEFLATE_ZOPFLI);
+		}else if(kzip){
+			fprintf(stderr,"(kzip)\n");
+			ret=_compress(stdin,stdout,zopfli,DEFLATE_KZIP);
 		}
 	}
 #ifdef NOTIMEOFDAY

@@ -121,6 +121,8 @@ static int _compress(FILE *in, FILE *out, int level, int method, int nthreads){
 				zlibbuf->func = igzip_deflate;
 			}else if(method==DEFLATE_CRYPTOPP){
 				zlibbuf->func = cryptopp_deflate;
+			}else if(method==DEFLATE_KZIP){
+				zlibbuf->func = kzip_deflate;
 			}
 			zlibbuf->encode = 1;
 			zlibbuf->rfc1950 = 1;
@@ -163,6 +165,8 @@ static int _compress(FILE *in, FILE *out, int level, int method, int nthreads){
 					fprintf(stderr,"isal_deflate %d\n",zlibbuf->ret);
 				}else if(method==DEFLATE_CRYPTOPP){
 					fprintf(stderr,"CryptoPP::Deflator::Put %d\n",zlibbuf->ret);
+				}else if(method==DEFLATE_KZIP){
+					fprintf(stderr,"kzip %d\n",zlibbuf->ret);
 				}
 				zlibutil_buffer_free(zlibbuf);
 				return 1;
@@ -214,14 +218,23 @@ static int _decompress(FILE *in, FILE *out, int nthreads){
 			u16 size=sizes[i];
 			fread(__compbuf,1,size,in);
 			size_t decompsize=DAX_BLOCK_SIZE;
+			zlibutil_buffer zlibbuf;
+			zlibbuf.dest = __decompbuf;
+			zlibbuf.destLen = decompsize;
+			zlibbuf.source = __compbuf;
+			zlibbuf.sourceLen = size;
+			zlibbuf.encode = 0;
+			zlibbuf.rfc1950 = 1;
+			zlibbuf.func = zlibutil_auto_inflate;
+			zlibutil_buffer_code(&zlibbuf);
 
-			int r=zlibutil_auto_inflate(__decompbuf,&decompsize,__compbuf+2,size-6);
+			int r=zlibbuf.ret;
 			if(r){
 				fprintf(stderr,"inflate %d\n",r);
 				return 1;
 			}
 
-			fwrite(__decompbuf,1,decompsize,out);
+			fwrite(zlibbuf.dest,1,zlibbuf.destLen,out);
 
 			i++;
 			if(i%256==0)fprintf(stderr,"%d / %d\r",i,total_block);
@@ -238,7 +251,7 @@ int main(const int argc, const char **argv){
 int _7daxcr(const int argc, const char **argv){
 #endif
 	int cmode=0,mode=0;
-	int zlib=0,sevenzip=0,zopfli=0,miniz=0,slz=0,libdeflate=0,zlibng=0,igzip=0,cryptopp=0;
+	int zlib=0,sevenzip=0,zopfli=0,miniz=0,slz=0,libdeflate=0,zlibng=0,igzip=0,cryptopp=0,kzip=0;
 	int threshold=100,nthreads=1;
 	poptContext optCon;
 	int optc;
@@ -254,6 +267,7 @@ int _7daxcr(const int argc, const char **argv){
 		{ "zlibng",     'n',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,    'n',       "1-9 (default 6) zlibng", "level" },
 		{ "cryptopp",     'C',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,    'C',       "1-9 (default 6) cryptopp", "level" },
 		{ "igzip",     'i',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,    'i',       "1-4 (default 1) igzip (1 becomes igzip internal level 0, 2 becomes 1, ...)", "level" },
+		{ "kzip",     'K',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,    'K',       "1-1 (default 1) kzip", "level" },
 		{ "zopfli",     'Z',         POPT_ARG_INT, &zopfli,    0,       "zopfli", "numiterations" },
 		//{ "threshold",  't',         POPT_ARG_INT, &threshold, 0,       "compression threshold (in %, 10-100)", "threshold" },
 		{ "threads",     '@',         POPT_ARG_INT, &nthreads,    0,       "threads", "threads" },
@@ -314,15 +328,21 @@ int _7daxcr(const int argc, const char **argv){
 				else igzip=1;
 				break;
 			}
+			case 'K':{
+				char *arg=poptGetOptArg(optCon);
+				if(arg)kzip=strtol(arg,NULL,10),free(arg);
+				else kzip=1;
+				break;
+			}
 		}
 	}
 
-	int level_sum=zlib+sevenzip+zopfli+miniz+slz+libdeflate+zlibng+igzip+cryptopp;
+	int level_sum=zlib+sevenzip+zopfli+miniz+slz+libdeflate+zlibng+igzip+cryptopp+kzip;
 	if(
 		optc<-1 ||
-		(!mode&&!zlib&&!sevenzip&&!zopfli&&!miniz&&!slz&&!libdeflate&&!zlibng&&!igzip&&!cryptopp) ||
-		(mode&&(zlib||sevenzip||zopfli||miniz||slz||libdeflate||zlibng||igzip||cryptopp)) ||
-		(!mode&&(level_sum==zlib)+(level_sum==sevenzip)+(level_sum==zopfli)+(level_sum==miniz)+(level_sum==slz)+(level_sum==libdeflate)+(level_sum==zlibng)+(level_sum==igzip)+(level_sum==cryptopp)!=1)
+		(!mode&&!zlib&&!sevenzip&&!zopfli&&!miniz&&!slz&&!libdeflate&&!zlibng&&!igzip&&!cryptopp&&!kzip) ||
+		(mode&&(zlib||sevenzip||zopfli||miniz||slz||libdeflate||zlibng||igzip||cryptopp||kzip)) ||
+		(!mode&&(level_sum==zlib)+(level_sum==sevenzip)+(level_sum==zopfli)+(level_sum==miniz)+(level_sum==slz)+(level_sum==libdeflate)+(level_sum==zlibng)+(level_sum==igzip)+(level_sum==cryptopp)+(level_sum==kzip)!=1)
 	){
 		poptPrintHelp(optCon, stderr, 0);
 		poptFreeContext(optCon);
@@ -394,6 +414,9 @@ int _7daxcr(const int argc, const char **argv){
 		}else if(cryptopp){
 			fprintf(stderr,"(cryptopp)\n");
 			ret=_compress(in,out,cryptopp,DEFLATE_CRYPTOPP,nthreads);
+		}else if(kzip){
+			fprintf(stderr,"(kzip)\n");
+			ret=_compress(in,out,kzip,DEFLATE_KZIP,nthreads);
 		}
 		fclose(in),fclose(out);
 	}

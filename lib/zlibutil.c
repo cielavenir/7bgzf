@@ -1,6 +1,7 @@
 //windowBits: 8..15: zlib, 24..31: gzip, -8..-15: raw
 
 #include <stdbool.h>
+#include <time.h>
 #include "zlibutil.h"
 #include "miniz.h"
 #include "slz.h"
@@ -47,9 +48,29 @@ int read_gz_header_generic(unsigned char *data, int size, int *extra_off, int *e
 	return n;
 }
 
+static inline unsigned int read32be(const void *p){
+	const unsigned char *x=(const unsigned char*)p;
+	return x[3]|(x[2]<<8)|(x[1]<<16)|((unsigned int)x[0]<<24);
+}
+
 static inline void write32be(void *p, const unsigned int n){
 	unsigned char *x=(unsigned char*)p;
 	x[3]=n&0xff,x[2]=(n>>8)&0xff,x[1]=(n>>16)&0xff,x[0]=(n>>24)&0xff;
+}
+
+static inline unsigned int read32(const void *p){
+	const unsigned char *x=(const unsigned char*)p;
+	return x[0]|(x[1]<<8)|(x[2]<<16)|((unsigned int)x[3]<<24);
+}
+
+static inline void write32(void *p, const unsigned int n){
+	unsigned char *x=(unsigned char*)p;
+	x[0]=n&0xff,x[1]=(n>>8)&0xff,x[2]=(n>>16)&0xff,x[3]=(n>>24)&0xff;
+}
+
+static inline void write16(void *p, const unsigned short n){
+	unsigned char *x=(unsigned char*)p;
+	x[0]=n&0xff,x[1]=(n>>8)&0xff;
 }
 
 int zlibutil_auto_inflate(
@@ -272,6 +293,31 @@ int zlib_inflate(
 	return inflateEnd(&z);
 }
 
+int store_deflate(
+	unsigned char *dest,
+	size_t *destLen,
+	const unsigned char *source,
+	size_t sourceLen,
+	int level
+){
+	int blocks = (sourceLen+65534)/65535;
+	if(*destLen<sourceLen+5*blocks)return Z_BUF_ERROR;
+	*destLen = 0;
+	for(int i=0;i<blocks;i++){
+		unsigned short blksize = 65535;
+		if(sourceLen<blksize)blksize=sourceLen;
+		dest[0]=i<blocks-1 ? 0x00 : 0x01;
+		write16(dest+1,blksize);
+		write16(dest+3,~blksize);
+		memcpy(dest+5,source,blksize);
+		source+=blksize;
+		sourceLen-=blksize;
+		dest+=blksize+5;
+		*destLen+=blksize+5;
+	}
+	return 0;
+}
+
 zlibutil_buffer *zlibutil_buffer_allocate(size_t destSiz, size_t sourceSiz){
 	zlibutil_buffer *zlibbuf=(zlibutil_buffer*)calloc(1,sizeof(zlibutil_buffer));
 	if(!zlibbuf)return NULL;
@@ -292,20 +338,65 @@ zlibutil_buffer *zlibutil_buffer_allocate(size_t destSiz, size_t sourceSiz){
 }
 zlibutil_buffer *zlibutil_buffer_code(zlibutil_buffer *zlibbuf){
 	if(!zlibbuf->encode){
+		// rfc1952 decoder handler will not be implemented as the header is not deterministic.
+		// also it is intended for large single stream.
+		if(zlibbuf->rfc1950){
+			zlibbuf->source+=2;
+			zlibbuf->sourceLen-=6;
+		}else if(zlibbuf->rfc1952){
+#if 0
+			zlibbuf->source+=X;
+			zlibbuf->sourceLen-=X+8;
+#endif
+		}
 		zlibbuf->ret = ((zlibutil_code_dec)zlibbuf->func)(zlibbuf->dest,&zlibbuf->destLen,zlibbuf->source,zlibbuf->sourceLen);
+		if(zlibbuf->rfc1950){
+			zlibbuf->source-=2;
+			zlibbuf->sourceLen+=6;
+			if(!zlibbuf->ret){
+				if( read32be(zlibbuf->source+zlibbuf->sourceLen-4) != adler32(1,zlibbuf->dest,zlibbuf->destLen) )zlibbuf->ret=Z_BUF_ERROR;
+			}
+		}else if(zlibbuf->rfc1952){
+#if 0
+			zlibbuf->source-=X;
+			zlibbuf->sourceLen+=X+8;
+			if(!zlibbuf->ret){
+				if( read32(zlibbuf->source+zlibbuf->sourceLen-8) != crc32(0,zlibbuf->dest,zlibbuf->destLen) )zlibbuf->ret=Z_BUF_ERROR;
+				if( read32(zlibbuf->source+zlibbuf->sourceLen-4) != zlibbuf->destLen )zlibbuf->ret=Z_BUF_ERROR;
+			}
+#endif
+		}
 	}else{
 		if(zlibbuf->rfc1950){
+			zlibbuf->dest[0]=0x78;
+			zlibbuf->dest[1]=0xda;
 			zlibbuf->destLen-=6;
 			zlibbuf->dest+=2;
+		}else if(zlibbuf->rfc1952){
+			zlibbuf->dest[0]=0x1f;
+			zlibbuf->dest[1]=0x8b;
+			zlibbuf->dest[2]=0x08;
+			zlibbuf->dest[3]=0x00;
+			time_t t=time(NULL);
+			write32(zlibbuf->dest+4,t);
+			zlibbuf->dest[8]=0x02; //0x02==Slow, 0x04==Fast
+			zlibbuf->dest[9]=0x00; //0x00==Win,  0x03==Unix
+			zlibbuf->destLen-=18;
+			zlibbuf->dest+=10;
 		}
 		zlibbuf->ret = ((zlibutil_code_enc)zlibbuf->func)(zlibbuf->dest,&zlibbuf->destLen,zlibbuf->source,zlibbuf->sourceLen,zlibbuf->level);
 		if(zlibbuf->rfc1950){
 			zlibbuf->dest-=2;
 			if(!zlibbuf->ret){
 				write32be(zlibbuf->dest+2+zlibbuf->destLen,adler32(1,zlibbuf->source,zlibbuf->sourceLen));
-				zlibbuf->dest[0]=0x78;
-				zlibbuf->dest[1]=0xda;
 				zlibbuf->destLen+=6;
+			}
+		}else if(zlibbuf->rfc1952){
+			zlibbuf->dest-=10;
+			if(!zlibbuf->ret){
+				write32(zlibbuf->dest+10+zlibbuf->destLen,crc32(0,zlibbuf->source,zlibbuf->sourceLen));
+				write32(zlibbuf->dest+10+zlibbuf->destLen+4,zlibbuf->sourceLen);
+				zlibbuf->destLen+=18;
 			}
 		}
 	}

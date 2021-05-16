@@ -20,6 +20,9 @@ enum{
 	DEFLATE_ZLIBNG,
 	DEFLATE_IGZIP,
 	DEFLATE_CRYPTOPP,
+
+	DEFLATE_STORE,
+	DEFLATE_KZIP,
 };
 
 typedef struct{
@@ -31,11 +34,14 @@ typedef struct{
 	int encode;
 	int level;
 	int rfc1950;
+	int rfc1952;
 	int ret;
 } zlibutil_buffer;
 zlibutil_buffer *zlibutil_buffer_allocate(size_t destSiz, size_t sourceSiz);
 zlibutil_buffer *zlibutil_buffer_code(zlibutil_buffer *zlibbuf);
 void zlibutil_buffer_free(zlibutil_buffer* zlibbuf);
+
+/// do not modify zlibutil_buffer content during it is passed to zlibutil_buffer_code() ///
 
 typedef int (*zlibutil_code_dec)(unsigned char*,size_t*,unsigned char*,size_t);
 typedef int (*zlibutil_code_enc)(unsigned char*,size_t*,unsigned char*,size_t,int);
@@ -173,6 +179,23 @@ int cryptopp_inflate(
 	size_t *destLen,
 	const unsigned char *source,
 	size_t sourceLen
+);
+
+int store_deflate(
+	unsigned char *dest,
+	size_t *destLen,
+	const unsigned char *source,
+	size_t sourceLen,
+	int level
+);
+
+/// sorry, kzip driver is not released for a while ///
+int kzip_deflate(
+	unsigned char *dest,
+	size_t *destLen,
+	const unsigned char *source,
+	size_t sourceLen,
+	int level
 );
 
 #ifdef __cplusplus
