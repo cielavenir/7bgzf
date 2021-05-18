@@ -1,3 +1,5 @@
+// mkstemps implementation based on https://github.com/mirror/mingw-w64/blob/master/mingw-w64-crt/misc/mkstemp.c
+
 #if defined(_WIN32) || (!defined(__GNUC__) && !defined(__clang__))
 #include <string.h>
 #include <errno.h>
