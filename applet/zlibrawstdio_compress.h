@@ -369,8 +369,14 @@ static int _compress(FILE *fin,FILE *fout,int level,int method){
 		z.zalloc = Z_NULL;
 		z.zfree = Z_NULL;
 		z.opaque = Z_NULL;
-
-		if(deflateInit2(&z,level,Z_DEFLATED, MAX_WBITS+16, 9, Z_DEFAULT_STRATEGY) != Z_OK){
+#if defined(ZLIBRAWSTDIO_COMPRESS_DEFLATE)
+		int windowBits = -MAX_WBITS;
+#elif defined(ZLIBRAWSTDIO_COMPRESS_ZLIB)
+		int windowBits = MAX_WBITS;
+#elif defined(ZLIBRAWSTDIO_COMPRESS_GZIP)
+		int windowBits = MAX_WBITS+16;
+#endif
+		if(deflateInit2(&z,level,Z_DEFLATED, windowBits, 9, Z_DEFAULT_STRATEGY) != Z_OK){
 			fprintf(stderr,"deflateInit: %s\n", (z.msg) ? z.msg : "???");
 			return 1;
 		}
