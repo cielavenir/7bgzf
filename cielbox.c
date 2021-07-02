@@ -162,7 +162,9 @@ __attribute__((noreturn)) static void usage(){
 	;
 
 	const char *compiler=
-#if defined(__INTEL_COMPILER)
+#if defined(__INTEL_CLANG_COMPILER)
+	" [icx]"
+#elif defined(__INTEL_COMPILER)
 	" [icc]"
 #elif defined(__OPENCC__)
 	" [opencc]"

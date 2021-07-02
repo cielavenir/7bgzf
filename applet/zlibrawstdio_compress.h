@@ -449,7 +449,7 @@ static int zlibrawstdio_main(const int argc, const char **argv){
 		POPT_TABLEEND,
 	};
 	optCon = poptGetContext(argv[0], argc, argv, optionsTable, 0);
-	poptSetOtherOptionHelp(optCon, "{-cz9 <dec.bin >enc.bz2} or {-cd <enc.bz2 >dec.bin}");
+	poptSetOtherOptionHelp(optCon, "{-cz9 <dec.bin >enc.gz} or {-cd <enc.gz >dec.bin}");
 
 	for(;(optc=poptGetNextOpt(optCon))>=0;){
 		switch(optc){

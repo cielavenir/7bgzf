@@ -14,11 +14,14 @@ export CC	:=	$(PREFIX)clang
 #export CXX	:=	$(PREFIX)clang++ -stdlib=libc++
 export CXX	:=	$(PREFIX)clang++
 else ifneq ($(OPEN64),)
-export CC       :=      $(PREFIX)opencc
-export CXX      :=      $(PREFIX)openCC
+export CC	:=	$(PREFIX)opencc
+export CXX	:=	$(PREFIX)openCC
 else ifneq ($(ICC),)
-export CC       :=      $(PREFIX)icc
-export CXX      :=      $(PREFIX)icpc
+export CC	:=	$(PREFIX)icc
+export CXX	:=	$(PREFIX)icpc
+else ifneq ($(ICX),)
+export CC	:=	$(PREFIX)icx
+export CXX	:=	$(PREFIX)icpx
 else
 export CC	:=	$(PREFIX)gcc
 export CXX	:=	$(PREFIX)g++
