@@ -42,6 +42,13 @@ void write32(void *p, const unsigned int n){
 #include "../lib/isa-l/include/igzip_lib.h"
 #include "../lib/popt/popt.h"
 
+#if !defined(NOIGZIP)
+#include "../lib/isa-l/include/crc.h"
+#define fcrc32 crc32_gzip_refl
+#else
+#define fcrc32 crc32
+#endif
+
 #ifdef NOTIMEOFDAY
 #include <time.h>
 #else
@@ -338,10 +345,10 @@ static int _compress(FILE *in, FILE *out, int level, int method, bool strip){
 			write32be(buf,zlibbuf.destLen);
 			unsigned int crc=0;
 			write32(buf+4,fourcc('I','D','A','T'));
-			crc=crc32(crc,buf+4,4);
+			crc=fcrc32(crc,buf+4,4);
 			fwrite(buf,1,8,out);
 
-			crc=crc32(crc,zlibbuf.dest,zlibbuf.destLen);
+			crc=fcrc32(crc,zlibbuf.dest,zlibbuf.destLen);
 			fwrite(zlibbuf.dest,1,zlibbuf.destLen,out);
 
 			write32be(buf,crc);

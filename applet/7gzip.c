@@ -1,6 +1,8 @@
 #define ZLIBRAWSTDIO_COMPRESS_GZIP
 #include "zlibrawstdio_compress.h"
 
+// `7gzip -S9` is quite similar to `7z a -tgzip -mx=9 -si -so dummy`
+
 //~~we still use gzip wrapper functions for concatenated gzip files.~~
 //now concatenated gzip can be handled on my own.
 static int _decompress(FILE *fin,FILE *fout){

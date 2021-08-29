@@ -47,6 +47,13 @@ void write16(void *p, const unsigned short n){
 #include "../cielbox.h"
 #endif
 
+#if !defined(NOIGZIP)
+#include "../lib/isa-l/include/crc.h"
+#define fcrc32 crc32_gzip_refl
+#else
+#define fcrc32 crc32
+#endif
+
 #include "../lib/lzma.h"
 #include "../lib/popt/popt.h"
 
@@ -216,7 +223,7 @@ static int _compress(FILE *in, FILE *out, int level, int method, int nthreads, i
 			write32(buf,compsize_record);
 			fwrite(buf,1,4,out);
 			fwrite(zlibbuf->dest,1,zlibbuf->destLen,out);
-			unsigned int crc=crc32(0,zlibbuf->source,zlibbuf->sourceLen);
+			unsigned int crc=fcrc32(0,zlibbuf->source,zlibbuf->sourceLen);
 			write32(buf,crc);
 			write32(buf+4,zlibbuf->sourceLen);
 			fwrite(buf,1,8,out);

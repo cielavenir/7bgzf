@@ -54,6 +54,13 @@ void *_memmem(const void *s1, size_t siz1, const void *s2, size_t siz2);
 #include "../lib/lzma.h"
 #include "../lib/popt/popt.h"
 
+#if !defined(NOIGZIP)
+#include "../lib/isa-l/include/crc.h"
+#define fcrc32 crc32_gzip_refl
+#else
+#define fcrc32 crc32
+#endif
+
 #ifdef NOTIMEOFDAY
 #include <time.h>
 #else
@@ -161,7 +168,7 @@ static int _compress(FILE *in, FILE *out, int level, int method, int nthreads){
 			}
 			fwrite("\x1f\x8b\x08\x10\x00\x00\x00\x00\x00\xff\x00",1,11,out);
 			fwrite(zlibbuf->dest,1,zlibbuf->destLen,out);
-			unsigned int crc=crc32(0,zlibbuf->source,zlibbuf->sourceLen);
+			unsigned int crc=fcrc32(0,zlibbuf->source,zlibbuf->sourceLen);
 			write32(buf,crc);
 			write32(buf+4,zlibbuf->sourceLen);
 			fwrite(buf,1,8,out);

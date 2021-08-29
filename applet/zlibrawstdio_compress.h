@@ -10,11 +10,20 @@ zlibrawstdio2: RFC 1951 (deflate)
 #include <time.h>
 #include <sys/time.h>
 #include "../lib/isa-l/include/igzip_lib.h"
+#include "../lib/isa-l/include/crc.h"
 #include "../lib/zlibutil.h"
 #include "../lib/lzma.h"
 #include "../lib/libdeflate/libdeflate.h"
 #include "../lib/zopfli/deflate.h"
+#include "../lib/slz.h"
+#include "../lib/miniz.h"
+// #include "../lib/zlib-ng/zlib-ng.h" // this collides with zlib.h...
 #include "../lib/popt/popt.h"
+
+#if !defined(NOIGZIP)
+#define adler32 isal_adler32
+#define crc32 crc32_gzip_refl
+#endif
 
 #if defined(_WIN32) || (!defined(__GNUC__) && !defined(__clang__))
 #else
@@ -212,6 +221,41 @@ static int _compress(FILE *fin,FILE *fout,int level,int method){
 #endif
 	}
 
+	if(method==DEFLATE_SLZ){
+		writeHeader(fout);
+		unsigned int crc=0;
+#if defined(ZLIBRAWSTDIO_COMPRESS_ZLIB)
+		crc=1;
+#endif
+		unsigned int size=0;
+
+		struct slz_stream strm;
+		slz_init(&strm, level, SLZ_FMT_DEFLATE);
+		for(;;){
+			int readlen = fread(__decompbuf,1,DECOMPBUFLEN,fin);
+			size += readlen;
+#if defined(ZLIBRAWSTDIO_COMPRESS_ZLIB)
+			crc=adler32(crc,__decompbuf,readlen);
+#elif defined(ZLIBRAWSTDIO_COMPRESS_GZIP)
+			crc=crc32(crc,__decompbuf,readlen);
+#endif
+			int writelen = slz_encode(&strm,__compbuf,__decompbuf,readlen,1);
+			fwrite(__compbuf,1,writelen,fout);
+
+			if(readlen<DECOMPBUFLEN){
+				//int writelen = slz_encode(&strm,__compbuf,__decompbuf,readlen,0);
+				//fwrite(__compbuf,1,writelen,fout);
+				int writelen = slz_finish(&strm,__compbuf);
+				fwrite(__compbuf,1,writelen,fout);
+				break;
+			}
+		}
+
+		writeTrailer(fout,crc,size);
+		fflush(fout);
+		return 0;
+	}
+
 	// the mmap logic is from https://github.com/ebiggers/libdeflate/blob/master/programs/prog_util.c
 	if(method==DEFLATE_LIBDEFLATE){
 		long long siz = filelengthi64(fileno(fin));
@@ -359,7 +403,86 @@ static int _compress(FILE *fin,FILE *fout,int level,int method){
 #endif
 		return 0;
 	}
-	
+
+	if(method==DEFLATE_MINIZ){
+		writeHeader(fout);
+		unsigned int crc=0;
+#if defined(ZLIBRAWSTDIO_COMPRESS_ZLIB)
+		crc=1;
+#endif
+		unsigned int size=0;
+
+		mz_stream z;
+		int status;
+		int flush=MZ_NO_FLUSH;
+		//long long filesize=filelengthi64(fileno(fin));
+
+		z.zalloc = Z_NULL;
+		z.zfree = Z_NULL;
+		z.opaque = Z_NULL;
+		//miniz does not supprt gzip mode
+//#if defined(ZLIBRAWSTDIO_COMPRESS_DEFLATE)
+		int windowBits = -MAX_WBITS;
+//#elif defined(ZLIBRAWSTDIO_COMPRESS_ZLIB)
+//		int windowBits = MAX_WBITS;
+//#elif defined(ZLIBRAWSTDIO_COMPRESS_GZIP)
+//		int windowBits = MAX_WBITS+16;
+//#endif
+		if(mz_deflateInit2(&z,level,MZ_DEFLATED, windowBits, 9, MZ_DEFAULT_STRATEGY) != Z_OK){
+			fprintf(stderr,"deflateInit: %s\n", (z.msg) ? z.msg : "???");
+			return 1;
+		}
+
+		z.next_in = __decompbuf;
+		z.avail_in = fread(__decompbuf,1,DECOMPBUFLEN,fin);
+#if defined(ZLIBRAWSTDIO_COMPRESS_ZLIB)
+		crc=adler32(crc,__decompbuf,z.avail_in);
+#elif defined(ZLIBRAWSTDIO_COMPRESS_GZIP)
+		crc=crc32(crc,__decompbuf,z.avail_in);
+#endif
+		size+=z.avail_in;
+		z.next_out = __compbuf;
+		z.avail_out = COMPBUFLEN;
+		if(z.avail_in < DECOMPBUFLEN)flush=Z_FINISH;
+
+		for(;;){
+			status = mz_deflate(&z, flush);
+			if(status == MZ_STREAM_END)break;
+			if(status != MZ_OK){
+				fprintf(stderr,"deflate: %s\n", (z.msg) ? z.msg : "???");
+				return 10;
+			}
+
+			//goto next buffer
+			if(z.avail_in == 0){
+				//if(flush==Z_FINISH){fprintf(stderr,"failed to complete deflation.\n");return 11;}
+				z.next_in = __decompbuf;
+				z.avail_in = fread(__decompbuf,1,DECOMPBUFLEN,fin);
+#if defined(ZLIBRAWSTDIO_COMPRESS_ZLIB)
+				crc=adler32(crc,__decompbuf,z.avail_in);
+#elif defined(ZLIBRAWSTDIO_COMPRESS_GZIP)
+				crc=crc32(crc,__decompbuf,z.avail_in);
+#endif
+				size+=z.avail_in;
+				if(z.avail_in < DECOMPBUFLEN)flush=Z_FINISH;
+			}
+			if(z.avail_out == 0){
+				fwrite(__compbuf,1,COMPBUFLEN,fout);
+				z.next_out = __compbuf;
+				z.avail_out = COMPBUFLEN;
+			}
+		}
+		fwrite(__compbuf,1,COMPBUFLEN-z.avail_out,fout);
+		writeTrailer(fout,crc,size);
+		fflush(fout);
+
+		if(mz_deflateEnd(&z) != Z_OK){
+			fprintf(stderr,"deflateEnd: %s\n", (z.msg) ? z.msg : "???");
+			return 2;
+		}
+		return 0;
+	}
+
 	if(method==DEFLATE_ZLIB){
 		z_stream z;
 		int status;
@@ -434,8 +557,8 @@ static int zlibrawstdio_main(const int argc, const char **argv){
 		//{ "longname", "shortname", argInfo,      *arg,       int val, description, argment description}
 		{ "stdout", 'c',         POPT_ARG_NONE,            &cmode,      0,       "stdout (currently ignored; always output to stdout)", NULL },
 		{ "zlib",   'z',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,       'z',     "1-9 (default 6) zlib", "level" },
-		//{ "miniz",     'm',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,    'm',       "1-9 (default 1) miniz", "level" },
-		//{ "slz",     's',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,    's',       "1-1 (default 1) slz", "level" },
+		{ "miniz",     'm',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,    'm',       "1-9 (default 1) miniz", "level" },
+		{ "slz",     's',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,    's',       "1-1 (default 1) slz", "level" },
 		{ "libdeflate",   'l',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,       'l',     "1-12 (default 6) libdeflate", "level" },
 		{ "7zip",     'S',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,    'S',       "1-9 (default 2) 7zip", "level" },
 		//{ "zlibng",     'n',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,    'n',       "1-9 (default 6) zlibng", "level" },

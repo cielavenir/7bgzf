@@ -64,6 +64,13 @@ int filelength(int fd){return filelengthi64(fd);}
 #include "../cielbox.h"
 #endif
 
+#if !defined(NOIGZIP)
+#include "../lib/isa-l/include/crc.h"
+#define fcrc32 crc32_gzip_refl
+#else
+#define fcrc32 crc32
+#endif
+
 #include "../lib/lzma.h"
 #include "../lib/popt/popt.h"
 
@@ -205,7 +212,7 @@ for(;;){
 			zlibbuf->sourceLen=fread(zlibbuf->source,1,block_size,in);
 			if(zlibbuf->sourceLen==-1)zlibbuf->sourceLen=0;
 			if(zlibbuf->sourceLen==0){zlibutil_buffer_free(zlibbuf);break;}
-			crc=crc32(crc,zlibbuf->source,zlibbuf->sourceLen);
+			crc=fcrc32(crc,zlibbuf->source,zlibbuf->sourceLen);
 			if(method==DEFLATE_ZLIB){
 				zlibbuf->func = zlib_deflate;
 			}else if(method==DEFLATE_7ZIP){
