@@ -178,7 +178,7 @@ typedef PTRDIFF_TYPE ptrdiff_t;
 
 #define HAVE_BUILTIN_CTZL
 #define UNALIGNED_OK
-#define WITH_GZFILEOP
+//#define WITH_GZFILEOP
 
 #if defined(__i386__) || defined(__x86_64__)
 	#ifdef X86_CPUID

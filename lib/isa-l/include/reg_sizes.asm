@@ -195,6 +195,23 @@
 
 %define XWORD(reg) reg %+ x
 
+%ifdef INTEL_CET_ENABLED
+ %ifdef __NASM_VER__
+  %if AS_FEATURE_LEVEL >= 10
+   %ifidn __OUTPUT_FORMAT__,elf32
+section .note.gnu.property  note  alloc noexec align=4
+DD 0x00000004,0x0000000c,0x00000005,0x00554e47
+DD 0xc0000002,0x00000004,0x00000003
+   %endif
+   %ifidn __OUTPUT_FORMAT__,elf64
+section .note.gnu.property  note  alloc noexec align=8
+DD 0x00000004,0x00000010,0x00000005,0x00554e47
+DD 0xc0000002,0x00000004,0x00000003,0x00000000
+   %endif
+  %endif
+ %endif
+%endif
+
 %ifidn __OUTPUT_FORMAT__,elf32
 section .note.GNU-stack noalloc noexec nowrite progbits
 section .text
@@ -277,15 +294,4 @@ section .text
  %define elf64 macho64
  mac_equ equ 1
 %endif
-
-%macro slversion 4
-	section .text
-	global %1_slver_%2%3%4
-	global %1_slver
-	%1_slver:
-	%1_slver_%2%3%4:
-		dw 0x%4
-		db 0x%3, 0x%2
-%endmacro
-
 %endif ; ifndef _REG_SIZES_ASM_

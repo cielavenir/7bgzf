@@ -65,7 +65,9 @@
 /* Stream status */
 
 #define HASH_BITS    16u           /* log2(HASH_SIZE) */
-#define HASH_SIZE 65536u           /* number of elements in hash table */
+#ifndef HASH_SIZE
+#  define HASH_SIZE 65536u         /* number of elements in hash table */
+#endif
 #define HASH_MASK (HASH_SIZE - 1u) /* HASH_SIZE-1 */
 
 
@@ -402,9 +404,9 @@ void Z_INTERNAL flush_pending(PREFIX3(streamp) strm);
 #  define sent_bits_add(s, bits)    s->bits_sent += (bits)
 #  define sent_bits_align(s)        s->bits_sent = (s->bits_sent + 7) & ~7L
 #else
-#  define cmpr_bits_add(s, len)     (void)(len)
+#  define cmpr_bits_add(s, len)     Z_UNUSED(len)
 #  define cmpr_bits_align(s)
-#  define sent_bits_add(s, bits)    (void)(bits)
+#  define sent_bits_add(s, bits)    Z_UNUSED(bits)
 #  define sent_bits_align(s)
 #endif
 

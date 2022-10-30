@@ -4,7 +4,7 @@
  * instruction.
  *
  * A white paper describing this algorithm can be found at:
- * http://www.intel.com/content/dam/www/public/us/en/documents/white-papers/fast-crc-computation-generic-polynomials-pclmulqdq-paper.pdf
+ * https://www.intel.com/content/dam/www/public/us/en/documents/white-papers/fast-crc-computation-generic-polynomials-pclmulqdq-paper.pdf
  *
  * Copyright (C) 2013 Intel Corporation. All rights reserved.
  * Authors:
@@ -187,7 +187,7 @@ static __attribute__((target("sse4.2,pclmul"))) void partial_fold(const size_t l
 
     const __m128i xmm_fold4 = _mm_set_epi32( 0x00000001, 0x54442bd4,
                                              0x00000001, 0xc6e41596);
-    const __m128i xmm_mask3 = _mm_set1_epi32(0x80808080);
+    const __m128i xmm_mask3 = _mm_set1_epi32((int32_t)0x80808080);
 
     __m128i xmm_shl, xmm_shr, xmm_tmp1, xmm_tmp2, xmm_tmp3;
     __m128i xmm_a0_0, xmm_a0_1;
@@ -359,7 +359,7 @@ Z_INTERNAL __attribute__((target("sse4.2,pclmul"))) void crc_fold_copy(deflate_s
     memcpy(dst, partial_buf, len);
 
 partial:
-    partial_fold(len, &xmm_crc0, &xmm_crc1, &xmm_crc2, &xmm_crc3, &xmm_crc_part);
+    partial_fold((size_t)len, &xmm_crc0, &xmm_crc1, &xmm_crc2, &xmm_crc3, &xmm_crc_part);
 done:
     /* CRC_SAVE */
     _mm_storeu_si128((__m128i *)s->crc0 + 0, xmm_crc0);
@@ -451,7 +451,7 @@ uint32_t Z_INTERNAL __attribute__((target("sse4.2,pclmul"))) crc_fold_512to32(de
     xmm_crc3 = _mm_xor_si128(xmm_crc3, xmm_crc2);
     xmm_crc3 = _mm_xor_si128(xmm_crc3, xmm_crc1);
 
-    crc = _mm_extract_epi32(xmm_crc3, 2);
+    crc = (uint32_t)_mm_extract_epi32(xmm_crc3, 2);
     return ~crc;
 }
 

@@ -3,6 +3,8 @@
 #if defined(__linux__)
 //#  include <sys/auxv.h>
 //#  include <asm/hwcap.h>
+#undef MIN
+#undef MAX
 #include "../../../libdeflate/arm/cpu_features.h"
 #elif defined(__FreeBSD__) && defined(__aarch64__)
 #  include <machine/armreg.h>
