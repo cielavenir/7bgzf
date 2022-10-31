@@ -7,7 +7,6 @@ extern "C"{
 
 #include "../compat.h"
 #include <stdio.h>
-#include <stdlib.h> // getenv
 #include <stdbool.h>
 
 #include "memstream.h"
@@ -46,7 +45,10 @@ typedef int (*tClose)(void *);
 
 int lzmaOpen7z();
 bool lzma7zAlive();
+int lzmaGet7zFileName(char* path, int siz);
 int lzmaClose7z();
+
+int lzmaShowInfos();
 
 /*
 Archive API
@@ -170,7 +172,38 @@ enum{
 	NCoderPropID_kBlockSize2,        // VT_UI4 or VT_UI8
 	NCoderPropID_kCheckSize,         // VT_UI4 : size of digest in bytes
 	NCoderPropID_kFilter,            // VT_BSTR
-	NCoderPropID_kMemUse             // VT_UI8
+	NCoderPropID_kMemUse,            // VT_UI8
+	NCoderPropID_kAffinity,          // VT_UI8
+};
+
+enum{
+	NMethodPropID_kID = 0,
+	NMethodPropID_kName,
+	NMethodPropID_kDecoder,
+	NMethodPropID_kEncoder,
+	NMethodPropID_kPackStreams,
+	NMethodPropID_kUnpackStreams,
+	NMethodPropID_kDescription,
+	NMethodPropID_kDecoderIsAssigned,
+	NMethodPropID_kEncoderIsAssigned,
+	NMethodPropID_kDigestSize,
+	NMethodPropID_kIsFilter,
+};
+
+// NArchive
+enum{
+	NHandlerPropID_kName = 0,        // VT_BSTR
+	NHandlerPropID_kClassID,         // binary GUID in VT_BSTR
+	NHandlerPropID_kExtension,       // VT_BSTR
+	NHandlerPropID_kAddExtension,    // VT_BSTR
+	NHandlerPropID_kUpdate,          // VT_BOOL
+	NHandlerPropID_kKeepName,        // VT_BOOL
+	NHandlerPropID_kSignature,       // binary in VT_BSTR
+	NHandlerPropID_kMultiSignature,  // binary in VT_BSTR
+	NHandlerPropID_kSignatureOffset, // VT_UI4
+	NHandlerPropID_kAltStreams,      // VT_BOOL
+	NHandlerPropID_kNtSecure,        // VT_BOOL
+	NHandlerPropID_kFlags,           // VT_UI4
 };
 
 enum
@@ -553,8 +586,8 @@ typedef struct{
 
 bool MakeSArchiveUpdateCallbackBare(SArchiveUpdateCallbackBare *self, IOutArchive_ *archiver, const char *password);
 
-int lzmaLoadUnrar();
-int lzmaUnloadUnrar();
+int lzmaLoadExternalCodecs();
+int lzmaUnloadExternalCodecs();
 
 unsigned long long FileTimeToUTC(const FILETIME in);
 FILETIME UTCToFileTime(const unsigned long long UTC);

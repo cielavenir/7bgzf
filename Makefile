@@ -11,8 +11,8 @@ DATA		+= data
 #--- set toolchain name
 ifneq ($(CLANG),)
 export CC	:=	$(PREFIX)clang
-#export CXX	:=	$(PREFIX)clang++ -stdlib=libc++
-export CXX	:=	$(PREFIX)clang++
+export CXX	:=	$(PREFIX)clang++ -stdlib=libc++
+#export CXX	:=	$(PREFIX)clang++
 else ifneq ($(OPEN64),)
 export CC	:=	$(PREFIX)opencc
 export CXX	:=	$(PREFIX)openCC
@@ -40,11 +40,11 @@ export LIBS
 LIBDIRS	:=	
 export LIBDIRS
 
-export INCLUDE	:=	$(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
+export INCLUDE	+=	$(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
 			$(foreach dir,$(LIBDIRS),-I$(dir)/include) \
 			-I$(CURDIR)/$(BUILD)
 
-export LIBPATHS	:=	$(foreach dir,$(LIBDIRS),-L$(dir)/lib)
+export LIBPATHS	+=	$(foreach dir,$(LIBDIRS),-L$(dir)/lib)
 
 #--- flags
 #ARCH	:=	
@@ -107,6 +107,7 @@ endif
 
 ifneq ($(NOIGZIP),)
 	CFLAGS += -DNOIGZIP
+	CXXFLAGS += -DNOIGZIP
 else
 	LIBS += ../lib/isa-l/bin/isa-l.a
 endif
@@ -148,7 +149,7 @@ export OFILES	:=	$(addsuffix .o,$(BINFILES)) \
  
 $(BUILD):
 	@[ -d $@ ] || mkdir -p $@
-	@[ "$(NOIGZIP)" != "" ] || CC=$(PREFIX)gcc CFLAGS="$(subst -flto,,$(CFLAGS))" CFLAGS_aarch64=-fno-stack-check make -C lib/isa-l -f Makefile.unx lib programs/igzip
+	@[ "$(NOIGZIP)" != "" ] || CC=$(PREFIX)gcc CFLAGS="$(subst -flto,,$(CFLAGS))" CFLAGS_aarch64="-fno-stack-check -DHWCAP_SVE=4194304" make -C lib/isa-l -f Makefile.unx lib programs/igzip
 	@make --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile -j4
 
 clean:

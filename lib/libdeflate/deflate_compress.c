@@ -30,6 +30,10 @@
 
 #include "libdeflate.h"
 
+#ifndef SIZE_MAX
+#include <limits.h>
+#endif
+
 /******************************************************************************/
 
 /*

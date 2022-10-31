@@ -10,7 +10,7 @@ sudo cp /usr/lib/x86_64-linux-gnu/crtn.o /usr/lib/crtn.o
 make clean
 echo "Self (Open64)"
 #ZLIBNG_X86=1
-OPEN64=1 ARCH="-mmmx -msse -msse2 -msse3 -pthread -D__builtin_bswap32=byteswap32 -D__builtin_bswap64=byteswap64" LIBS="-pthread -ldl" SUFF=_open64 make
+OPEN64=1 ARCH="-I/usr/include/x86_64-linux-gnu -DOPEN64=1 -mmmx -msse -msse2 -msse3 -pthread -D__builtin_bswap32=byteswap32 -D__builtin_bswap64=byteswap64" LIBS="-pthread -ldl" SUFF=_open64 make
 ### now LIBS--nolibopen64rt is invalid.
 make clean
 

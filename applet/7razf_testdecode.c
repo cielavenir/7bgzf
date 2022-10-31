@@ -389,7 +389,7 @@ int inflate_testdecode(z_streamp strm, int flush)
 
 	z_const unsigned char FAR *final;
 	unsigned bits_final;
-	unsigned ret_bits;
+	int ret_bits=-1; // init by negative value; negative means error anyway
 
     if (strm == Z_NULL || strm->state == Z_NULL || strm->next_out == Z_NULL ||
         (strm->next_in == Z_NULL && strm->avail_in != 0))

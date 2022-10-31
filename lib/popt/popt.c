@@ -1093,6 +1093,7 @@ int xx;
 
 s = (expr ? expr : t);
 xx = poptParseArgvString(s, &ac, &av);	/* XXX split on CSV character set. */
+xx; // avoid warn
 assert(!xx && av);
 
     if (av)

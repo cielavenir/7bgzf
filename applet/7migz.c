@@ -415,7 +415,7 @@ int _7migz(const int argc, const char **argv){
 	){
 		poptPrintHelp(optCon, stderr, 0);
 		poptFreeContext(optCon);
-		if(!lzmaOpen7z())fprintf(stderr,"\nNote: 7-zip is AVAILABLE.\n"),lzmaClose7z();
+		if(!lzmaOpen7z()){char path[768];lzmaGet7zFileName(path, 768);fprintf(stderr,"\nNote: 7-zip is AVAILABLE (%s).\n", path);lzmaClose7z();}
 		else fprintf(stderr,"\nNote: 7-zip is NOT available.\n");
 		return 1;
 	}

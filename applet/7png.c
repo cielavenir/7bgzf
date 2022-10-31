@@ -502,7 +502,7 @@ int _7png(const int argc, const char **argv){
 
 		fprintf(stderr,"\nUsing \"-t\" will cause only to strip unnecessary chunks without recompression.\n");
 
-		if(!lzmaOpen7z())fprintf(stderr,"Note: 7-zip is AVAILABLE.\n"),lzmaClose7z();
+		if(!lzmaOpen7z()){char path[768];lzmaGet7zFileName(path, 768);fprintf(stderr,"Note: 7-zip is AVAILABLE (%s).\n", path);lzmaClose7z();}
 		else fprintf(stderr,"Note: 7-zip is NOT available.\n");
 		return 1;
 	}

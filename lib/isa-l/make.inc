@@ -91,7 +91,6 @@ LDFLAGS_so = -Wl,-soname,$(soname)
 ifeq ($(arch),mingw)
   CC=x86_64-w64-mingw32-gcc
   AR=x86_64-w64-mingw32-ar
-  AS=yasm
   LDFLAGS += -Wl,--force-exe-suffix
   SIM=wine
   EXT=.exe
@@ -114,6 +113,9 @@ endif
 ARFLAGS_aarch64 = cr $@
 ifeq ($(arch),aarch64)
   AS=$(CC) -D__ASSEMBLY__
+  ifeq ($(CC),aarch64-linux-android-gcc)
+    AS=aarch64-none-elf-gcc -D__ASSEMBLY__
+  endif
   SIM=
 endif
 

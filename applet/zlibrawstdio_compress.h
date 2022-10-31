@@ -16,7 +16,7 @@ zlibrawstdio2: RFC 1951 (deflate)
 #include "../lib/libdeflate/libdeflate.h"
 #include "../lib/zopfli/deflate.h"
 #include "../lib/slz.h"
-#include "../lib/miniz.h"
+#include "../lib/miniz/miniz.h"
 // #include "../lib/zlib-ng/zlib-ng.h" // this collides with zlib.h...
 #include "../lib/popt/popt.h"
 
@@ -267,7 +267,7 @@ static int _compress(FILE *fin,FILE *fout,int level,int method){
 		HANDLE *h = CreateFileMapping(_get_osfhandle(fileno(fin)), NULL, PAGE_READONLY, 0, 0, NULL);
 		char *mem = MapViewOfFile(h, FILE_MAP_READ, 0, 0, siz);
 #else
-		char *mem = mmap(NULL, siz, PROT_READ, MAP_SHARED, fileno(fin), 0);
+		char *mem = mmap(NULL, siz, PROT_READ, MAP_PRIVATE, fileno(fin), 0);
 #endif
 		if(!mem){
 			fprintf(stderr,"failed mmap\n");
@@ -316,7 +316,7 @@ static int _compress(FILE *fin,FILE *fout,int level,int method){
 		HANDLE *h = CreateFileMapping(_get_osfhandle(fileno(fin)), NULL, PAGE_READONLY, 0, 0, NULL);
 		char *mem = MapViewOfFile(h, FILE_MAP_READ, 0, 0, siz);
 #else
-		char *mem = mmap(NULL, siz, PROT_READ, MAP_SHARED, fileno(fin), 0);
+		char *mem = mmap(NULL, siz, PROT_READ, MAP_PRIVATE, fileno(fin), 0);
 #endif
 		if(!mem){
 			fprintf(stderr,"failed mmap\n");
@@ -365,7 +365,7 @@ static int _compress(FILE *fin,FILE *fout,int level,int method){
 		HANDLE *h = CreateFileMapping(_get_osfhandle(fileno(fin)), NULL, PAGE_READONLY, 0, 0, NULL);
 		char *mem = MapViewOfFile(h, FILE_MAP_READ, 0, 0, siz);
 #else
-		char *mem = mmap(NULL, siz, PROT_READ, MAP_SHARED, fileno(fin), 0);
+		char *mem = mmap(NULL, siz, PROT_READ, MAP_PRIVATE, fileno(fin), 0);
 #endif
 		if(!mem){
 			fprintf(stderr,"failed mmap\n");
@@ -642,7 +642,7 @@ static int zlibrawstdio_main(const int argc, const char **argv){
 	){
 		poptPrintHelp(optCon, stderr, 0);
 		poptFreeContext(optCon);
-		if(!lzmaOpen7z())fprintf(stderr,"\nNote: 7-zip is AVAILABLE.\n"),lzmaClose7z();
+		if(!lzmaOpen7z()){char path[768];lzmaGet7zFileName(path, 768);fprintf(stderr,"\nNote: 7-zip is AVAILABLE (%s).\n", path);lzmaClose7z();}
 		else fprintf(stderr,"\nNote: 7-zip is NOT available.\n");
 		return 1;
 	}

@@ -8,7 +8,7 @@
 #include <fcntl.h>
 #include <share.h>
 
-int __cdecl mkstemps (char *template_name, int suffix_len)
+int __cdecl mkostemps (char *template_name, int suffix_len, int flags)
 {
     int i, j, fd, len, index;
 
@@ -34,7 +34,7 @@ int __cdecl mkstemps (char *template_name, int suffix_len)
             template_name[j] = letters[rand () % 62];
         }
         fd = _sopen(template_name,
-                _O_RDWR | _O_CREAT | _O_EXCL | _O_BINARY,
+                _O_RDWR | _O_CREAT | _O_EXCL | _O_BINARY | flags,
                 _SH_DENYRW, _S_IREAD | _S_IWRITE);
         if (fd != -1) return fd;
         if (fd == -1 && errno != EEXIST) return -1;
@@ -42,4 +42,13 @@ int __cdecl mkstemps (char *template_name, int suffix_len)
 
     return -1;
 }
+
+int __cdecl mkstemps (char *template_name, int suffix_len){
+    return mkostemps(template_name, suffix_len, 0);
+}
+
+int __cdecl mkostemp (char *template_name, int flags){
+    return mkostemps(template_name, 0, flags);
+}
+
 #endif
