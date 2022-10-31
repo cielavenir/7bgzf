@@ -26,3 +26,5 @@ make clean
 # [obsolete]
 # 1. put droid-ndk-gcc to $PATH then link to droid-ndk-{g++,ld,strip}
 # 2. put specs to /opt/android-ndk/toolchains/arm-linux-androideabi-4.4.3/prebuilt/linux-x86/lib/gcc/arm-linux-androideabi/4.4.3/
+
+# for arm64, need `aarch64-none-eabi-gcc`. Homebrew can use gcc-aarch64-embedded cask. Debian can install gcc-aarch64-linux-gnu and symlink aarch64-linux-gnu-gcc to aarch64-none-eabi-gcc.
