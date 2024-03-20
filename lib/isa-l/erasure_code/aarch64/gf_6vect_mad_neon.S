@@ -61,7 +61,7 @@ x_tbl3		.req	x15
 x_tbl4		.req	x16
 x_tbl5		.req	x17
 x_tbl6		.req	x_tbl
-x_const		.req	x18
+x_const		.req	x0
 
 /* vectors */
 v_mask0f	.req	v0
@@ -611,11 +611,7 @@ cdecl(gf_6vect_mad_neon):
 	mov	w_ret, #1
 	ret
 
-#ifndef __APPLE__
-	.section .rodata
-#else
-	.section __TEXT,__const
-#endif
+ASM_DEF_RODATA
 .balign 8
 const_tbl:
 	.dword 0x0000000000000000, 0x0000000000000000

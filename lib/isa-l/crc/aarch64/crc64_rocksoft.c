@@ -1,9 +1,9 @@
 /**********************************************************************
-  Copyright(c) 2011-2015 Intel Corporation All rights reserved.
+  Copyright(c) 2023 Intel Corporation All rights reserved.
 
   Redistribution and use in source and binary forms, with or without
-  modification, are permitted provided that the following conditions
-  are met:
+ modification, are permitted provided that the following conditions
+ are met:
     * Redistributions of source code must retain the above copyright
       notice, this list of conditions and the following disclaimer.
     * Redistributions in binary form must reproduce the above copyright
@@ -27,51 +27,15 @@
   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 **********************************************************************/
 
+#include "crc64.h"
+#include <stdint.h>
 
-/**
- *  @file  types.h
- *  @brief Defines standard width types.
- *
- */
-
-#ifndef __TYPES_H
-#define __TYPES_H
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#ifdef _WIN32
-#ifdef __MINGW32__
-# include <_mingw.h>
-#endif
-#endif
-
-
-#if defined  __unix__ || defined __APPLE__
-# define DECLARE_ALIGNED(decl, alignval) decl __attribute__((aligned(alignval)))
-# define __forceinline static inline
-# define aligned_free(x) free(x)
-#else
-# ifdef __MINGW32__
-#   define DECLARE_ALIGNED(decl, alignval) decl __attribute__((aligned(alignval)))
-#   define posix_memalign(p, algn, len) (NULL == (*((char**)(p)) = (void*) _aligned_malloc(len, algn)))
-#   define aligned_free(x) _aligned_free(x)
-# else
-#   define DECLARE_ALIGNED(decl, alignval) __declspec(align(alignval)) decl
-#   define posix_memalign(p, algn, len) (NULL == (*((char**)(p)) = (void*) _aligned_malloc(len, algn)))
-#   define aligned_free(x) _aligned_free(x)
-# endif
-#endif
-
-#ifdef DEBUG
-# define DEBUG_PRINT(x) printf x
-#else
-# define DEBUG_PRINT(x) do {} while (0)
-#endif
-
-#ifdef __cplusplus
+uint64_t crc64_rocksoft_refl(uint64_t seed, const uint8_t * buf, uint64_t len)
+{
+	return crc64_rocksoft_refl_base(seed, buf, len);
 }
-#endif
 
-#endif  //__TYPES_H
+uint64_t crc64_rocksoft_norm(uint64_t seed, const uint8_t * buf, uint64_t len)
+{
+	return crc64_rocksoft_norm_base(seed, buf, len);
+}
