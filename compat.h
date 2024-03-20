@@ -47,6 +47,7 @@ typedef long long s64;
 #define lrotl(val,rot) (( (val)<<(rot) )|( (val)>>(sizeof(val)*CHAR_BIT-(rot)) ))
 
 #if defined(_WIN32) || (!defined(__GNUC__) && !defined(__clang__))
+	#define _myIsWindows 1
 	#include <windows.h>
 	#include <fcntl.h>
 	#include <io.h>
@@ -61,6 +62,7 @@ typedef long long s64;
 	#define LLU "I64u"
 	#define LLX "I64x"
 #else
+	#define _myIsWindows 0
 	#include <unistd.h>
 	#include <sys/stat.h>
 	int filelength(int fd);
@@ -117,6 +119,8 @@ int sfilemode(const char *path);
 
 extern unsigned char buf[BUFLEN];
 #define cbuf ((char*)buf)
+
+#define FNAME_MAX32 512
 
 #ifdef __cplusplus
 }
