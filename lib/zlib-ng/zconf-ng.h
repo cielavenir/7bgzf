@@ -38,6 +38,9 @@
  * created by gzip. (Files created by minigzip can still be extracted by
  * gzip.)
  */
+#ifndef MIN_WBITS
+#  define MIN_WBITS   8  /* 256 LZ77 window */
+#endif
 #ifndef MAX_WBITS
 #  define MAX_WBITS   15 /* 32K LZ77 window */
 #endif
@@ -93,6 +96,9 @@
 #ifndef Z_EXPORTVA
 #  define Z_EXPORTVA
 #endif
+
+/* Conditional exports */
+#define ZNG_CONDEXPORT Z_EXPORT
 
 /* Fallback for something that includes us. */
 typedef unsigned char Byte;
@@ -172,31 +178,6 @@ typedef PTRDIFF_TYPE ptrdiff_t;
 #  else
 #    define z_off64_t z_off_t
 #  endif
-#endif
-
-/// preconfigured setting ///
-
-#define HAVE_BUILTIN_CTZL
-#define UNALIGNED_OK
-#define WITH_GZFILEOP
-
-#if defined(__i386__) || defined(__x86_64__)
-	#ifdef X86_CPUID
-		#define X86_FEATURES
-		#define X86_SSE2
-		#define X86_SSE42_CRC_HASH
-		#define X86_SSE42_CRC_INTRIN
-		#define X86_PCLMULQDQ_CRC
-		#define X86_AVX2_ADLER32
-		#define X86_SSSE3_ADLER32
-		#define X86_AVX_CHUNKSET
-		#define X86_AVX2
-		#define HAVE_BUILTIN_CTZ
-		#define X86_SSE42_CMP_STR
-	#endif
-#elif defined(__aarch64__) || defined(__arm__)
-#elif defined(__s390__)
-#elif defined(__powerpc__)
 #endif
 
 #endif /* ZCONFNG_H */
