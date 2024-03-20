@@ -16,7 +16,7 @@ zlibrawstdio2: RFC 1951 (deflate)
 #include "../lib/libdeflate/libdeflate.h"
 #include "../lib/zopfli/deflate.h"
 #include "../lib/slz.h"
-#include "../lib/miniz.h"
+#include "../lib/miniz/miniz.h"
 // #include "../lib/zlib-ng/zlib-ng.h" // this collides with zlib.h...
 #include "../lib/popt/popt.h"
 
@@ -267,7 +267,7 @@ static int _compress(FILE *fin,FILE *fout,int level,int method){
 		HANDLE *h = CreateFileMapping(_get_osfhandle(fileno(fin)), NULL, PAGE_READONLY, 0, 0, NULL);
 		char *mem = MapViewOfFile(h, FILE_MAP_READ, 0, 0, siz);
 #else
-		char *mem = mmap(NULL, siz, PROT_READ, MAP_SHARED, fileno(fin), 0);
+		char *mem = mmap(NULL, siz, PROT_READ, MAP_PRIVATE, fileno(fin), 0);
 #endif
 		if(!mem){
 			fprintf(stderr,"failed mmap\n");
@@ -316,7 +316,7 @@ static int _compress(FILE *fin,FILE *fout,int level,int method){
 		HANDLE *h = CreateFileMapping(_get_osfhandle(fileno(fin)), NULL, PAGE_READONLY, 0, 0, NULL);
 		char *mem = MapViewOfFile(h, FILE_MAP_READ, 0, 0, siz);
 #else
-		char *mem = mmap(NULL, siz, PROT_READ, MAP_SHARED, fileno(fin), 0);
+		char *mem = mmap(NULL, siz, PROT_READ, MAP_PRIVATE, fileno(fin), 0);
 #endif
 		if(!mem){
 			fprintf(stderr,"failed mmap\n");
@@ -365,7 +365,7 @@ static int _compress(FILE *fin,FILE *fout,int level,int method){
 		HANDLE *h = CreateFileMapping(_get_osfhandle(fileno(fin)), NULL, PAGE_READONLY, 0, 0, NULL);
 		char *mem = MapViewOfFile(h, FILE_MAP_READ, 0, 0, siz);
 #else
-		char *mem = mmap(NULL, siz, PROT_READ, MAP_SHARED, fileno(fin), 0);
+		char *mem = mmap(NULL, siz, PROT_READ, MAP_PRIVATE, fileno(fin), 0);
 #endif
 		if(!mem){
 			fprintf(stderr,"failed mmap\n");
@@ -499,7 +499,13 @@ static int _compress(FILE *fin,FILE *fout,int level,int method){
 #elif defined(ZLIBRAWSTDIO_COMPRESS_GZIP)
 		int windowBits = MAX_WBITS+16;
 #endif
-		if(deflateInit2(&z,level,Z_DEFLATED, windowBits, 9, Z_DEFAULT_STRATEGY) != Z_OK){
+		if(deflateInit2(&z,level,Z_DEFLATED, windowBits,
+#if NO_EMULATEGZIP
+			9,
+#else
+			8,
+#endif
+			Z_DEFAULT_STRATEGY) != Z_OK){
 			fprintf(stderr,"deflateInit: %s\n", (z.msg) ? z.msg : "???");
 			return 1;
 		}
@@ -540,6 +546,36 @@ static int _compress(FILE *fin,FILE *fout,int level,int method){
 		return 0;
 	}
 
+	if(method==DEFLATE_STORE){
+		writeHeader(fout);
+		unsigned int crc=0;
+#if defined(ZLIBRAWSTDIO_COMPRESS_ZLIB)
+		crc=1;
+#endif
+		unsigned int size=0;
+
+    for(;;){
+			int readlen = fread(__decompbuf,1,65535,fin);
+			size += readlen;
+#if defined(ZLIBRAWSTDIO_COMPRESS_ZLIB)
+			crc=adler32(crc,__decompbuf,readlen);
+#elif defined(ZLIBRAWSTDIO_COMPRESS_GZIP)
+			crc=crc32(crc,__decompbuf,readlen);
+#endif
+      __compbuf[0] = !!(readlen < 65535);
+			write16(__compbuf+1, readlen);
+			write16(__compbuf+3, ~readlen);
+			fwrite(__compbuf,1,5,fout);
+      fwrite(__decompbuf,1,readlen,fout);
+      if(readlen < 65535)break;
+		}
+
+		writeTrailer(fout,crc,size);
+		fflush(fout);
+
+		return 0;
+	}
+
 	return -1;
 }
 
@@ -547,7 +583,7 @@ static int _decompress(FILE *fin,FILE *fout);
 
 static int zlibrawstdio_main(const int argc, const char **argv){
 	int cmode=0,mode=0;
-	int zlib=0,sevenzip=0,zopfli=0,miniz=0,slz=0,libdeflate=0,zlibng=0,igzip=0,cryptopp=0,kzip=0;
+	int zlib=0,sevenzip=0,zopfli=0,miniz=0,slz=0,libdeflate=0,zlibng=0,igzip=0,cryptopp=0,kzip=0,store=0;
 	//int nthreads=1;
 	//int bsize=0;
 	poptContext optCon;
@@ -566,6 +602,7 @@ static int zlibrawstdio_main(const int argc, const char **argv){
 		{ "igzip",   'i',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,       'i',     "1-4 (default 1) igzip (1 becomes igzip internal level 0, 2 becomes 1, ...)", "level" },
 		{ "kzip",     'K',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,    'K',       "1-1 (default 1) kzip", "level" },
 		{ "zopfli",     'Z',         POPT_ARG_INT, &zopfli,    0,       "zopfli", "numiterations" },
+		{ "store",     'T',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,    'T',       "1-1 (default 1) store", "level" },
 		//{ "threshold",  't',         POPT_ARG_INT, &threshold, 0,       "compression threshold (in %, 10-100)", "threshold" },
 		{ "decompress", 'd',         POPT_ARG_NONE,            &mode,      0,       "decompress", NULL },
 		POPT_AUTOHELP,
@@ -630,19 +667,25 @@ static int zlibrawstdio_main(const int argc, const char **argv){
 				else kzip=1;
 				break;
 			}
+			case 'T':{
+				char *arg=poptGetOptArg(optCon);
+				if(arg)store=strtol(arg,NULL,10),free(arg);
+				else store=1;
+				break;
+			}
 		}
 	}
 
-	int level_sum=zlib+sevenzip+zopfli+miniz+slz+libdeflate+zlibng+igzip+cryptopp+kzip;
+	int level_sum=zlib+sevenzip+zopfli+miniz+slz+libdeflate+zlibng+igzip+cryptopp+kzip+store;
 	if(
 		optc<-1 ||
-		(!mode&&!zlib&&!sevenzip&&!zopfli&&!miniz&&!slz&&!libdeflate&&!zlibng&&!igzip&&!cryptopp&&!kzip) ||
-		(mode&&(zlib||sevenzip||zopfli||miniz||slz||libdeflate||zlibng||igzip||cryptopp||kzip)) ||
-		(!mode&&(level_sum==zlib)+(level_sum==sevenzip)+(level_sum==zopfli)+(level_sum==miniz)+(level_sum==slz)+(level_sum==libdeflate)+(level_sum==zlibng)+(level_sum==igzip)+(level_sum==cryptopp)+(level_sum==kzip)!=1)
+		(!mode&&!zlib&&!sevenzip&&!zopfli&&!miniz&&!slz&&!libdeflate&&!zlibng&&!igzip&&!cryptopp&&!kzip&&!store) ||
+		(mode&&(zlib||sevenzip||zopfli||miniz||slz||libdeflate||zlibng||igzip||cryptopp||kzip||store)) ||
+		(!mode&&(level_sum==zlib)+(level_sum==sevenzip)+(level_sum==zopfli)+(level_sum==miniz)+(level_sum==slz)+(level_sum==libdeflate)+(level_sum==zlibng)+(level_sum==igzip)+(level_sum==cryptopp)+(level_sum==kzip)+(level_sum==store)!=1)
 	){
 		poptPrintHelp(optCon, stderr, 0);
 		poptFreeContext(optCon);
-		if(!lzmaOpen7z())fprintf(stderr,"\nNote: 7-zip is AVAILABLE.\n"),lzmaClose7z();
+		if(!lzmaOpen7z()){char path[768];lzmaGet7zFileName(path, 768);fprintf(stderr,"\nNote: 7-zip is AVAILABLE (%s).\n", path);lzmaClose7z();}
 		else fprintf(stderr,"\nNote: 7-zip is NOT available.\n");
 		return 1;
 	}
@@ -703,7 +746,10 @@ static int zlibrawstdio_main(const int argc, const char **argv){
 			ret=_compress(stdin,stdout,zopfli,DEFLATE_ZOPFLI);
 		}else if(kzip){
 			fprintf(stderr,"(kzip)\n");
-			ret=_compress(stdin,stdout,zopfli,DEFLATE_KZIP);
+			ret=_compress(stdin,stdout,kzip,DEFLATE_KZIP);
+		}else if(store){
+			fprintf(stderr,"(store)\n");
+			ret=_compress(stdin,stdout,store,DEFLATE_STORE);
 		}
 	}
 #ifdef NOTIMEOFDAY

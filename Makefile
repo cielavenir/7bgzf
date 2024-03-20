@@ -4,7 +4,7 @@ ifneq ($(BUILD),$(notdir $(CURDIR)))
 
 TARGET ?= cielbox
 
-SOURCES		+= applet applet_stl applet/hash lib lib/cryptonite lib/libmshlsplash lib/zlib lib/zopfli lib/libdeflate lib/lz4 lib/zstd lib/libbzip2 lib/popt .
+SOURCES		+= applet lib lib/zlib lib/zlib/contrib lib/zopfli lib/libdeflate lib/miniz lib/popt .
 INCLUDES	+= 
 DATA		+= data 
 
@@ -40,11 +40,11 @@ export LIBS
 LIBDIRS	:=	
 export LIBDIRS
 
-export INCLUDE	:=	$(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
+export INCLUDE	+=	$(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
 			$(foreach dir,$(LIBDIRS),-I$(dir)/include) \
 			-I$(CURDIR)/$(BUILD)
 
-export LIBPATHS	:=	$(foreach dir,$(LIBDIRS),-L$(dir)/lib)
+export LIBPATHS	+=	$(foreach dir,$(LIBDIRS),-L$(dir)/lib)
 
 #--- flags
 #ARCH	:=	
@@ -55,8 +55,8 @@ CFLAGS	:=	-Wall -Wno-parentheses \
 			$(ARCH)
 
 ifeq ($(WIN32),)
-	#enable 7ZIP_ST in non-Win32
-	CFLAGS += -D_7ZIP_ST
+	#enable Z7_ST in non-Win32
+	CFLAGS += -DZ7_ST
 endif
 ifneq ($(CRYPTOPP),)
         SOURCES += lib/cryptopp
@@ -107,6 +107,7 @@ endif
 
 ifneq ($(NOIGZIP),)
 	CFLAGS += -DNOIGZIP
+	CXXFLAGS += -DNOIGZIP
 else
 	LIBS += ../lib/isa-l/bin/isa-l.a
 endif
@@ -148,7 +149,7 @@ export OFILES	:=	$(addsuffix .o,$(BINFILES)) \
  
 $(BUILD):
 	@[ -d $@ ] || mkdir -p $@
-	@[ "$(NOIGZIP)" != "" ] || CC=$(PREFIX)gcc CFLAGS="$(subst -flto,,$(CFLAGS))" CFLAGS_aarch64=-fno-stack-check make -C lib/isa-l -f Makefile.unx lib programs/igzip
+	@[ "$(NOIGZIP)" != "" ] || CC=$(PREFIX)gcc CFLAGS="$(subst -flto,,$(CFLAGS))" CFLAGS_aarch64="-fno-stack-check -DHWCAP_SVE=4194304" make -C lib/isa-l -f Makefile.unx lib programs/igzip
 	@make --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile -j4
 
 clean:

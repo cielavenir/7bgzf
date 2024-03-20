@@ -49,6 +49,18 @@ void write32(void *p, const unsigned int n){
 #define fcrc32 crc32
 #endif
 
+static void putchunk(FILE *f,const char *head,const char *content,int contentsiz){
+    unsigned char _buf[4];
+    write32be(_buf,contentsiz);
+    fwrite(_buf,1,4,f);
+    fwrite(head,1,4,f);
+    if(contentsiz)fwrite(content,1,contentsiz,f);
+    unsigned int crc=fcrc32(0,head,4);
+    if(contentsiz)crc=fcrc32(crc,content,contentsiz);
+    write32be(_buf,crc);
+    fwrite(_buf,1,4,f);
+}
+
 #ifdef NOTIMEOFDAY
 #include <time.h>
 #else
@@ -312,6 +324,8 @@ static int _compress(FILE *in, FILE *out, int level, int method, bool strip){
 				zlibbuf.func = cryptopp_deflate;
 			}else if(method==DEFLATE_KZIP){
 				zlibbuf.func = kzip_deflate;
+			}else if(method==DEFLATE_STORE){
+				zlibbuf.func = store_deflate;
 			}
 
 			zlibutil_buffer_code(&zlibbuf);
@@ -337,29 +351,18 @@ static int _compress(FILE *in, FILE *out, int level, int method, bool strip){
 					fprintf(stderr,"CryptoPP::Deflator::Put %d\n",zlibbuf.ret);
 				}else if(method==DEFLATE_KZIP){
 					fprintf(stderr,"kzip %d\n",zlibbuf.ret);
+				}else if(method==DEFLATE_STORE){
+					fprintf(stderr,"store_deflate %d\n",zlibbuf.ret);
 				}
 				free(__compbuf);
 				return 1;
 			}
 
-			write32be(buf,zlibbuf.destLen);
-			unsigned int crc=0;
-			write32(buf+4,fourcc('I','D','A','T'));
-			crc=fcrc32(crc,buf+4,4);
-			fwrite(buf,1,8,out);
-
-			crc=fcrc32(crc,zlibbuf.dest,zlibbuf.destLen);
-			fwrite(zlibbuf.dest,1,zlibbuf.destLen,out);
-
-			write32be(buf,crc);
-			fwrite(buf,1,4,out);
+                        putchunk(out,"IDAT",zlibbuf.dest,zlibbuf.destLen);
 			fprintf(stderr,"recompressed length=%d\n",(int)zlibbuf.destLen);
 			free(__compbuf);
 
-			write32be(buf,0);
-			write32(buf+4,fourcc('I','E','N','D'));
-			write32be(buf+8,0xae426082);
-			fwrite(buf,1,12,out);
+                        putchunk(out,"IEND",NULL,0);
 		}else{
 			bool copy=!strip || type==fourcc('I','H','D','R') || type==fourcc('P','L','T','E') || type==fourcc('t','R','N','S') || type==fourcc('I','D','A','T') || type==fourcc('I','E','N','D');
 			if(type==fourcc('C','g','B','I')){
@@ -406,7 +409,7 @@ int main(const int argc, const char **argv){
 int _7png(const int argc, const char **argv){
 #endif
 	int cmode=0,mode=0;
-	int zlib=0,sevenzip=0,zopfli=0,miniz=0,slz=0,libdeflate=0,zlibng=0,igzip=0,cryptopp=0,kzip=0;
+	int zlib=0,sevenzip=0,zopfli=0,miniz=0,slz=0,libdeflate=0,zlibng=0,igzip=0,cryptopp=0,kzip=0,store=0;
 	poptContext optCon;
 	int optc;
 
@@ -423,6 +426,7 @@ int _7png(const int argc, const char **argv){
 		{ "igzip",     'i',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,    'i',       "1-4 (default 1) igzip (1 becomes igzip internal level 0, 2 becomes 1, ...)", "level" },
 		{ "kzip",     'K',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,    'K',       "1-1 (default 1) kzip", "level" },
 		{ "zopfli",     'Z',         POPT_ARG_INT, &zopfli,    0,       "zopfli", "numiterations" },
+		{ "store",     'T',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,    'T',       "1-1 (default 1) store", "level" },
 		//{ "threshold",  't',         POPT_ARG_INT, &threshold, 0,       "compression threshold (in %, 10-100)", "threshold" },
 		{ "strip", 't',         POPT_ARG_NONE,            &mode,      0,       "strip", "strip unnecessary chunks" },
 		POPT_AUTOHELP,
@@ -487,22 +491,28 @@ int _7png(const int argc, const char **argv){
 				else kzip=1;
 				break;
 			}
+			case 'T':{
+				char *arg=poptGetOptArg(optCon);
+				if(arg)store=strtol(arg,NULL,10),free(arg);
+				else store=1;
+				break;
+			}
 		}
 	}
 
-	int level_sum=zlib+sevenzip+zopfli+miniz+slz+libdeflate+zlibng+igzip+cryptopp+kzip;
+	int level_sum=zlib+sevenzip+zopfli+miniz+slz+libdeflate+zlibng+igzip+cryptopp+kzip+store;
 	if(
 		optc<-1 ||
-		(!mode&&!zlib&&!sevenzip&&!zopfli&&!miniz&&!slz&&!libdeflate&&!zlibng&&!igzip&&!cryptopp&&!kzip)// ||
-		//(mode&&(zlib||sevenzip||zopfli||miniz||slz||libdeflate||zlibng||igzip||cryptopp||kzip)) ||
-		//(!mode&&(level_sum==zlib)+(level_sum==sevenzip)+(level_sum==zopfli)+(level_sum==miniz)+(level_sum==slz)+(level_sum==libdeflate)+(level_sum==zlibng)+(level_sum==igzip)+(level_sum==cryptopp)+(level_sum==kzip)!=1)
+		(!mode&&!zlib&&!sevenzip&&!zopfli&&!miniz&&!slz&&!libdeflate&&!zlibng&&!igzip&&!cryptopp&&!kzip&&!store)// ||
+		//(mode&&(zlib||sevenzip||zopfli||miniz||slz||libdeflate||zlibng||igzip||cryptopp||kzip||store)) ||
+		//(!mode&&(level_sum==zlib)+(level_sum==sevenzip)+(level_sum==zopfli)+(level_sum==miniz)+(level_sum==slz)+(level_sum==libdeflate)+(level_sum==zlibng)+(level_sum==igzip)+(level_sum==cryptopp)+(level_sum==kzip)+(level_sum==store)!=1)
 	){
 		poptPrintHelp(optCon, stderr, 0);
 		poptFreeContext(optCon);
 
 		fprintf(stderr,"\nUsing \"-t\" will cause only to strip unnecessary chunks without recompression.\n");
 
-		if(!lzmaOpen7z())fprintf(stderr,"Note: 7-zip is AVAILABLE.\n"),lzmaClose7z();
+		if(!lzmaOpen7z()){char path[768];lzmaGet7zFileName(path, 768);fprintf(stderr,"Note: 7-zip is AVAILABLE (%s).\n", path);lzmaClose7z();}
 		else fprintf(stderr,"Note: 7-zip is NOT available.\n");
 		return 1;
 	}
@@ -556,6 +566,9 @@ int _7png(const int argc, const char **argv){
 	}else if(kzip){
 		fprintf(stderr,"(kzip)\n");
 		ret=_compress(stdin,stdout,kzip,DEFLATE_KZIP,mode);
+	}else if(store){
+		fprintf(stderr,"(store)\n");
+		ret=_compress(stdin,stdout,store,DEFLATE_STORE,mode);
 	}else if(mode){
 		fprintf(stderr,"(strip)\n");
 		ret=_compress(stdin,stdout,0,0,mode);

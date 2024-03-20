@@ -123,6 +123,8 @@ static int _compress(FILE *in, FILE *out, int level, int method, int nthreads){
 				zlibbuf->func = cryptopp_deflate;
 			}else if(method==DEFLATE_KZIP){
 				zlibbuf->func = kzip_deflate;
+			}else if(method==DEFLATE_STORE){
+				zlibbuf->func = store_deflate;
 			}
 			zlibbuf->encode = 1;
 			zlibbuf->rfc1950 = 1;
@@ -167,6 +169,8 @@ static int _compress(FILE *in, FILE *out, int level, int method, int nthreads){
 					fprintf(stderr,"CryptoPP::Deflator::Put %d\n",zlibbuf->ret);
 				}else if(method==DEFLATE_KZIP){
 					fprintf(stderr,"kzip %d\n",zlibbuf->ret);
+				}else if(method==DEFLATE_STORE){
+					fprintf(stderr,"store_deflate %d\n",zlibbuf->ret);
 				}
 				zlibutil_buffer_free(zlibbuf);
 				return 1;
@@ -251,7 +255,7 @@ int main(const int argc, const char **argv){
 int _7daxcr(const int argc, const char **argv){
 #endif
 	int cmode=0,mode=0;
-	int zlib=0,sevenzip=0,zopfli=0,miniz=0,slz=0,libdeflate=0,zlibng=0,igzip=0,cryptopp=0,kzip=0;
+	int zlib=0,sevenzip=0,zopfli=0,miniz=0,slz=0,libdeflate=0,zlibng=0,igzip=0,cryptopp=0,kzip=0,store=0;
 	int threshold=100,nthreads=1;
 	poptContext optCon;
 	int optc;
@@ -269,6 +273,7 @@ int _7daxcr(const int argc, const char **argv){
 		{ "igzip",     'i',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,    'i',       "1-4 (default 1) igzip (1 becomes igzip internal level 0, 2 becomes 1, ...)", "level" },
 		{ "kzip",     'K',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,    'K',       "1-1 (default 1) kzip", "level" },
 		{ "zopfli",     'Z',         POPT_ARG_INT, &zopfli,    0,       "zopfli", "numiterations" },
+		{ "store",     'T',         POPT_ARG_INT|POPT_ARGFLAG_OPTIONAL, NULL,    'T',       "1-1 (default 1) store", "level" },
 		//{ "threshold",  't',         POPT_ARG_INT, &threshold, 0,       "compression threshold (in %, 10-100)", "threshold" },
 		{ "threads",     '@',         POPT_ARG_INT, &nthreads,    0,       "threads", "threads" },
 		{ "decompress", 'd',         POPT_ARG_NONE,            &mode,      0,       "decompress", NULL },
@@ -334,19 +339,25 @@ int _7daxcr(const int argc, const char **argv){
 				else kzip=1;
 				break;
 			}
+			case 'T':{
+				char *arg=poptGetOptArg(optCon);
+				if(arg)store=strtol(arg,NULL,10),free(arg);
+				else store=1;
+				break;
+			}
 		}
 	}
 
-	int level_sum=zlib+sevenzip+zopfli+miniz+slz+libdeflate+zlibng+igzip+cryptopp+kzip;
+	int level_sum=zlib+sevenzip+zopfli+miniz+slz+libdeflate+zlibng+igzip+cryptopp+kzip+store;
 	if(
 		optc<-1 ||
-		(!mode&&!zlib&&!sevenzip&&!zopfli&&!miniz&&!slz&&!libdeflate&&!zlibng&&!igzip&&!cryptopp&&!kzip) ||
-		(mode&&(zlib||sevenzip||zopfli||miniz||slz||libdeflate||zlibng||igzip||cryptopp||kzip)) ||
-		(!mode&&(level_sum==zlib)+(level_sum==sevenzip)+(level_sum==zopfli)+(level_sum==miniz)+(level_sum==slz)+(level_sum==libdeflate)+(level_sum==zlibng)+(level_sum==igzip)+(level_sum==cryptopp)+(level_sum==kzip)!=1)
+		(!mode&&!zlib&&!sevenzip&&!zopfli&&!miniz&&!slz&&!libdeflate&&!zlibng&&!igzip&&!cryptopp&&!kzip&&!store) ||
+		(mode&&(zlib||sevenzip||zopfli||miniz||slz||libdeflate||zlibng||igzip||cryptopp||kzip||store)) ||
+		(!mode&&(level_sum==zlib)+(level_sum==sevenzip)+(level_sum==zopfli)+(level_sum==miniz)+(level_sum==slz)+(level_sum==libdeflate)+(level_sum==zlibng)+(level_sum==igzip)+(level_sum==cryptopp)+(level_sum==kzip)+(level_sum==store)!=1)
 	){
 		poptPrintHelp(optCon, stderr, 0);
 		poptFreeContext(optCon);
-		if(!lzmaOpen7z())fprintf(stderr,"\nNote: 7-zip is AVAILABLE.\n"),lzmaClose7z();
+		if(!lzmaOpen7z()){char path[768];lzmaGet7zFileName(path, 768);fprintf(stderr,"\nNote: 7-zip is AVAILABLE (%s).\n", path);lzmaClose7z();}
 		else fprintf(stderr,"\nNote: 7-zip is NOT available.\n");
 		return 1;
 	}
@@ -417,6 +428,9 @@ int _7daxcr(const int argc, const char **argv){
 		}else if(kzip){
 			fprintf(stderr,"(kzip)\n");
 			ret=_compress(in,out,kzip,DEFLATE_KZIP,nthreads);
+		}else if(store){
+			fprintf(stderr,"(store)\n");
+			ret=_compress(in,out,store,DEFLATE_STORE,nthreads);
 		}
 		fclose(in),fclose(out);
 	}

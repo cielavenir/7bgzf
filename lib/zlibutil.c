@@ -1,9 +1,13 @@
+// #define RFC1952_DECODER 1
+// rfc1952 decoder handler will not be implemented as the header is not deterministic.
+// also zlibutil_buffer_code is intended for single stream.
+
 //windowBits: 8..15: zlib, 24..31: gzip, -8..-15: raw
 
 #include <stdbool.h>
 #include <time.h>
 #include "zlibutil.h"
-#include "miniz.h"
+#include "miniz/miniz.h"
 #include "slz.h"
 #include "zlib/zutil.h" // DEF_MEM_LEVEL
 #include "libdeflate/libdeflate.h"
@@ -58,10 +62,12 @@ static inline void write32be(void *p, const unsigned int n){
 	x[3]=n&0xff,x[2]=(n>>8)&0xff,x[1]=(n>>16)&0xff,x[0]=(n>>24)&0xff;
 }
 
+#if RFC1952_DECODER
 static inline unsigned int read32(const void *p){
 	const unsigned char *x=(const unsigned char*)p;
 	return x[0]|(x[1]<<8)|(x[2]<<16)|((unsigned int)x[3]<<24);
 }
+#endif
 
 static inline void write32(void *p, const unsigned int n){
 	unsigned char *x=(unsigned char*)p;
@@ -338,13 +344,11 @@ zlibutil_buffer *zlibutil_buffer_allocate(size_t destSiz, size_t sourceSiz){
 }
 zlibutil_buffer *zlibutil_buffer_code(zlibutil_buffer *zlibbuf){
 	if(!zlibbuf->encode){
-		// rfc1952 decoder handler will not be implemented as the header is not deterministic.
-		// also it is intended for large single stream.
 		if(zlibbuf->rfc1950){
 			zlibbuf->source+=2;
 			zlibbuf->sourceLen-=6;
 		}else if(zlibbuf->rfc1952){
-#if 0
+#if RFC1952_DECODER
 			zlibbuf->source+=X;
 			zlibbuf->sourceLen-=X+8;
 #endif
@@ -357,7 +361,7 @@ zlibutil_buffer *zlibutil_buffer_code(zlibutil_buffer *zlibbuf){
 				if( read32be(zlibbuf->source+zlibbuf->sourceLen-4) != adler32(1,zlibbuf->dest,zlibbuf->destLen) )zlibbuf->ret=Z_BUF_ERROR;
 			}
 		}else if(zlibbuf->rfc1952){
-#if 0
+#if RFC1952_DECODER
 			zlibbuf->source-=X;
 			zlibbuf->sourceLen+=X+8;
 			if(!zlibbuf->ret){

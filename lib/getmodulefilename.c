@@ -1,19 +1,80 @@
 #include "../compat.h"
 #include "xutil.h" // myfgets
+#include <stdlib.h>
 #include <string.h>
 #include <dirent.h>
 
 #if defined(__APPLE__)
 #include <mach-o/dyld.h>
-#elif defined(__linux__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__bsdi__) || defined(__DragonFly__)
+#elif defined(__linux__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__bsdi__) || defined(__DragonFly__) || defined(__sun__)
 #include <link.h>
+#endif
+
+#if defined(__FreeBSD__)
+#include <sys/sysctl.h>
 #endif
 
 #if defined(_WIN32) || (!defined(__GNUC__) && !defined(__clang__))
 #else
+// pFilename is assured
+static int GetModuleFileNameA_NULL(char *pFilename,int nSize){
+	// https://stackoverflow.com/questions/1023306/finding-current-executables-path-without-proc-self-exe
+#if defined(NODLOPEN)
+	return 0;
+#elif defined(FEOS)
+	return 0;
+#elif defined(__APPLE__)
+	unsigned int bufsize = nSize-1;
+	if(_NSGetExecutablePath(pFilename, &bufsize)<0){
+		return 0;
+	}
+	pFilename[bufsize]=0;
+	return bufsize;
+#elif defined(__sun__)
+	char *fname = getexecname(hModule);
+	if(fname){
+		int s = strlen(fname);
+		int nCopy = min(nSize,s+1);
+		memcpy(pFilename,fname,nCopy);
+		return nCopy;
+	}
+#elif defined(__FreeBSD__)
+	int mib[4];
+	mib[0] = CTL_KERN;
+	mib[1] = KERN_PROC;
+	mib[2] = KERN_PROC_PATHNAME;
+	mib[3] = -1;
+	size_t bufsize = nSize-1;
+	if(sysctl(mib, 4, pFilename, &bufsize, NULL, 0)<0){
+		return 0;
+	}
+	pFilename[bufsize]=0;
+	return bufsize;
+#elif defined(__linux__)
+	int ret = readlink("/proc/self/exe",pFilename,nSize-1);
+	if(ret==-1)return 0;
+	if(ret<nSize)pFilename[ret]=0;
+	return ret;
+#elif defined(__NetBSD__)
+	int ret = readlink("/proc/curproc/exe",pFilename,nSize-1);
+	if(ret==-1)return 0;
+	if(ret<nSize)pFilename[ret]=0;
+	return ret;
+#elif defined(__OpenBSD__) || defined(__DragonFly__) || defined(__bsdi__)
+	// OpenBSD: https://man.openbsd.org/OpenBSD-5.5/mount_procfs.8
+	// BSD/OS:  not tested
+	int ret = readlink("/proc/curproc/file",pFilename,nSize-1);
+	if(ret==-1)return 0;
+	if(ret<nSize)pFilename[ret]=0;
+	return ret;
+#endif
+	return 0;
+}
+
 int GetModuleFileNameA(void *hModule,char *pFilename,int nSize){
 	if(!pFilename)return 0;
 	pFilename[0]=0;
+	if(!hModule)return GetModuleFileNameA_NULL(pFilename, nSize);
 #if defined(NODLOPEN)
 	return 0;
 #elif defined(FEOS)
@@ -107,7 +168,7 @@ int GetModuleFileNameA(void *hModule,char *pFilename,int nSize){
 		memcpy(pFilename,image_name,nCopy);
 		return nCopy;
 	}
-#elif defined(__linux__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__bsdi__) || defined(__DragonFly__)
+#elif defined(__linux__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__bsdi__) || defined(__DragonFly__) || defined(__sun__)
 	struct link_map *lm=NULL;
 	dlinfo(hModule, RTLD_DI_LINKMAP, &lm);
 	if(lm && lm->l_name){

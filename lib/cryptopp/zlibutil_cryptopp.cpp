@@ -34,9 +34,9 @@ extern "C" int cryptopp_inflate(
 		//zipper.Put(source,sourceLen);
 		zipper.Put2(source,sourceLen,1,true);
 		//zipper.MessageEnd();
-	}catch(CryptoPP::Inflator::BadBlockErr){
+	}catch(const CryptoPP::Inflator::BadBlockErr&){
 		return Z_DATA_ERROR;
-	}catch(CryptoPP::Inflator::BadDistanceErr){
+	}catch(const CryptoPP::Inflator::BadDistanceErr&){
 		return Z_DATA_ERROR;
 	}
 	size_t avail = zipper.MaxRetrievable();
