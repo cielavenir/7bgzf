@@ -25,8 +25,16 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#ifndef LIB_CPU_FEATURES_COMMON_H
+#define LIB_CPU_FEATURES_COMMON_H
+
 #if defined(TEST_SUPPORT__DO_NOT_USE) && !defined(FREESTANDING)
-#  define _GNU_SOURCE 1 /* for strdup() and strtok_r() */
+   /* for strdup() and strtok_r() */
+#  undef _ANSI_SOURCE
+#  ifndef __APPLE__
+#    undef _GNU_SOURCE
+#    define _GNU_SOURCE
+#  endif
 #  include <stdio.h>
 #  include <stdlib.h>
 #  include <string.h>
@@ -81,3 +89,5 @@ disable_cpu_features_for_testing(u32 *features,
 {
 }
 #endif /* !TEST_SUPPORT__DO_NOT_USE */
+
+#endif /* LIB_CPU_FEATURES_COMMON_H */

@@ -25,7 +25,12 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifdef __AVX2__
+#ifndef LIB_X86_MATCHFINDER_IMPL_H
+#define LIB_X86_MATCHFINDER_IMPL_H
+
+#include "cpu_features.h"
+
+#if HAVE_AVX2_NATIVE
 #  include <immintrin.h>
 static forceinline void
 matchfinder_init_avx2(mf_pos_t *data, size_t size)
@@ -70,7 +75,7 @@ matchfinder_rebase_avx2(mf_pos_t *data, size_t size)
 }
 #define matchfinder_rebase matchfinder_rebase_avx2
 
-#elif defined(__SSE2__)
+#elif HAVE_SSE2_NATIVE
 #  include <emmintrin.h>
 static forceinline void
 matchfinder_init_sse2(mf_pos_t *data, size_t size)
@@ -114,4 +119,6 @@ matchfinder_rebase_sse2(mf_pos_t *data, size_t size)
 	} while (size != 0);
 }
 #define matchfinder_rebase matchfinder_rebase_sse2
-#endif /* __SSE2__ */
+#endif /* HAVE_SSE2_NATIVE */
+
+#endif /* LIB_X86_MATCHFINDER_IMPL_H */
