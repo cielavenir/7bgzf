@@ -1,8 +1,10 @@
 [version]
-zlib       1.2.11
+zlib       1.3.1
 zopfli     1.0.3/bd64b2f  191128
-miniz      2.1.0/a426483  190506
-slz        1.2.0/ff53715  200216
-libdeflate 1.7/448e3f3    201109
-zlib-ng    2.0.2/5fe2590  210324
-isa-l      2.30.0/2df39cf 201106
+miniz      3.0.2/293d4db  230115
+slz        1.2.1/e1f256e  221023
+libdeflate 1.19/dd12ff2   230917
+zlib-ng    2.1.6/7425372  240111
+isa-l      2.31 (ciel's aarch64 patch)
+
+popt       1.19/916e610   220607
