@@ -149,7 +149,7 @@ export OFILES	:=	$(addsuffix .o,$(BINFILES)) \
  
 $(BUILD):
 	@[ -d $@ ] || mkdir -p $@
-	@[ "$(NOIGZIP)" != "" ] || CC=$(PREFIX)gcc CFLAGS="$(subst -flto,,$(CFLAGS))" CFLAGS_aarch64="-fno-stack-check -DHWCAP_SVE=4194304" make -C lib/isa-l -f Makefile.unx lib programs/igzip
+	@[ "$(NOIGZIP)" != "" ] || make CC=$(PREFIX)gcc CFLAGS_="$(subst -flto,,$(CFLAGS))" CFLAGS_aarch64="-fno-stack-check -DHWCAP_SVE=4194304" -C lib/isa-l -f Makefile.unx lib programs/igzip
 	@make --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile -j4
 
 clean:
