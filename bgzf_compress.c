@@ -59,12 +59,13 @@ int bgzf_compress(void *_dst, size_t *_dlen, const void *src, size_t slen, int l
 			//fputs(smethod,stderr);fputs("\n",stderr);
 			//set level
 			int _level=-1;
+			int digit=1;
 			int l=strlen(smethod);
 			int i=l-1;
 			for(;i>=0 && '0'<=smethod[i]&&smethod[i]<='9';i--){
 				if(_level<0)_level=0;
-				_level*=10;
-				_level+=smethod[i]-'0';
+				_level+=digit*(smethod[i]-'0');
+				digit*=10;
 			}
 			if(_level>=0)level=_level;
 			//set method
