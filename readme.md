@@ -8,6 +8,7 @@
 - p7zip and htslib could be installed by system administration command.
 - 7bgzf.so can be injected into libhts.so using LD_PRELOAD environment variable.
     - However, since LD_PRELOAD utilizes procedure linkage table (PLT), samtools / bcftools need to link to libhts.so (not a).
+        - The simplest way is to change config.mk.in `@Hsource@HTSLIB = $(HTSDIR)/libhts.a` to libhts.so.
     - BGZF_METHOD environment variable is used to set the compression method. For example, BGZF_METHOD=libdeflate12 means libdeflate level 12.
     - Example: `BGZF_METHOD=libdeflate12 LD_PRELOAD=./7bgzf.so samtools view ...`
 
