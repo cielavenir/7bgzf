@@ -3,8 +3,8 @@ zlib       1.3.1
 zopfli     1.0.3/bd64b2f  191128
 miniz      3.0.2/293d4db  230115
 slz        1.2.1/e1f256e  221023
-libdeflate 1.19/dd12ff2   230917
+libdeflate 1.23/7805198   241210
 zlib-ng    2.1.6/7425372  240111
-isa-l      2.31 (ciel's aarch64 patch)
+isa-l      2.31.1/c387163 250107
 
 popt       1.19/916e610   220607

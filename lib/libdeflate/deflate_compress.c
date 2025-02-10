@@ -28,10 +28,6 @@
 #include "deflate_compress.h"
 #include "deflate_constants.h"
 
-#ifndef SIZE_MAX
-#include <limits.h>
-#endif
-
 /******************************************************************************/
 
 /*
@@ -1477,6 +1473,8 @@ deflate_get_offset_slot(u32 offset)
 	 * the equivalent (for offset <= 536871168) 'n = (256 - offset) >> 29'.
 	 */
 	unsigned n = (256 - offset) >> 29;
+
+	ASSERT(offset >= 1 && offset <= 32768);
 
 	return deflate_offset_slot[(offset - 1) >> n] + (n << 1);
 }
