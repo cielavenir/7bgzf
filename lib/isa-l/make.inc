@@ -39,7 +39,7 @@
 #	trace - get simulator trace
 #	clean - remove object files
 
-version ?= 2.30.0
+version ?= 2.31.1
 host_cpu ?= $(shell uname -m | sed -e 's/amd/x86_/')
 arch ?= $(shell uname | grep -v -e Linux -e BSD )
 
@@ -48,17 +48,7 @@ ifeq ($(host_cpu)_$(arch),aarch64_)
   arch = aarch64
 endif
 
-CC  ?= $(PREFIX)gcc
-
-ifeq ($(CC),cc)
-	CC = gcc
-else
-	ifeq ($(findstring -,$(CC)),)
-	else
-		AR = $(shell echo $(CC) | sed -E -e 's/-[^-]+$$/-ar/')
-	endif
-endif
-
+CC  ?= gcc
 AS  = nasm
 AWK = awk
 
@@ -67,7 +57,7 @@ DEBUG_yasm = -g dwarf2
 DEBUG_nasm = -g
 
 # Default arch= build options
-CFLAGS_    = -Wall
+CFLAGS_    = -Wall -Wchar-subscripts -Wformat-security -Wnested-externs -Wpointer-arith -Wshadow -Wstrict-prototypes -Wtype-limits -fstack-protector -D_FORTIFY_SOURCE=2
 ASFLAGS_   = -f elf64
 ARFLAGS_   = cr $@
 STRIP_gcc  = strip -d -R .comment $@
@@ -86,7 +76,16 @@ ARFLAGS_win64 = -out:$@
 ASFLAGS_mingw = -f win64
 ARFLAGS_mingw = cr $@
 
-LDFLAGS_so = -Wl,-soname,$(soname)
+ifneq ($(arch),mingw)
+LDFLAGS_so = -Wl,-z,noexecstack -Wl,-z,relro -Wl,-z,now -Wl,-soname,$(soname)
+ifeq ($(shell uname),Linux)
+ifeq ($(host_cpu),x86_64)
+  # CFLAGS_ += -fcf-protection=full
+  ASFLAGS_ += -DINTEL_CET_ENABLED
+  # LDFLAGS += -Wl,-z,ibt -Wl,-z,shstk -Wl,-z,cet-report=error
+endif
+endif
+endif
 
 ifeq ($(arch),mingw)
   CC=x86_64-w64-mingw32-gcc
@@ -128,7 +127,7 @@ endif
 
 D :=
 INCLUDE   = $(patsubst %,-I%/,$(subst :, ,$(VPATH)))
-CFLAGS   = $(CFLAGS_$(arch)) $(CFLAGS_$(CC)) $(DEBUG) -O2 $(DEFINES) $(INCLUDE)
+CFLAGS   = $(CFLAGS_$(arch)) $(CFLAGS_$(CC)) $(DEBUG) -O2 $(DEFINES) $(INCLUDE) -D$(host_cpu)
 ASFLAGS  = $(ASFLAGS_$(arch)) $(ASFLAGS_$(CC)) $(DEBUG_$(AS)) $(DEFINES) $(INCLUDE)
 ARFLAGS  = $(ARFLAGS_$(arch))
 DEFINES += $(addprefix -D , $D)
@@ -205,8 +204,12 @@ ASFLAGS += -DAS_FEATURE_LEVEL=$(as_feature_level) $(D_HAVE_AS_KNOWS_AVX512_y)
 
 
 # Check for pthreads
-have_threads ?= $(shell printf "int main(void){return 0;}\n" | $(CC) -x c - -o /dev/null -lpthread && echo y )
-THREAD_LD_$(have_threads) := -lpthread
+ifeq ($(arch),mingw)
+have_threads ?= y
+else
+have_threads ?= $(shell printf "int main(void){return 0;}\n" | $(CC) -x c - -o /dev/null -pthread && echo y )
+endif
+THREAD_LD_$(have_threads) := -pthread
 THREAD_CFLAGS_$(have_threads) := -DHAVE_THREADS
 
 progs: $(bin_PROGRAMS)
@@ -252,7 +255,7 @@ $(O)/%.o: $(host_cpu)/%.S
 $(O)/%.o   : $(host_cpu)/%.c
 	@echo "  ---> Building $< $(msg)"
 	@$(COMPILE.c) $(OUTPUT_OPTION) $<
-$(O)/%.o %.o: %.c
+$(O)/%.o: %.c
 	@echo "  ---> Building $< $(msg)"
 	@$(COMPILE.c) $(OUTPUT_OPTION) $<
 
@@ -389,4 +392,22 @@ doc: isa-l.h
 	(cat Doxyfile; echo 'PROJECT_NUMBER=$(version)') | doxygen -
 	$(MAKE) -C generated_doc/latex &> generated_doc/latex_build_api.log
 	cp generated_doc/latex/refman.pdf isa-l_api_$(version).pdf
+
+# Check spelling in the code with codespell.
+# See https://github.com/codespell-project/codespell for more details.
+# Codespell options explained:
+# -d        -- disable colours (emacs colours it anyway)
+# -L        -- List of words to be ignored
+# -S <skip> -- skip file types
+# -I FILE   -- File containing words to be ignored
+#
+CODESPELL ?= codespell
+CS_IGNORE_WORDS ?= iinclude,struc,fo,ue,od,ba,padd,hist,unx,sav,datas
+
+.PHONY: spellcheck
+spellcheck:
+	$(CODESPELL) -d -L $(CS_IGNORE_WORDS) \
+	-S "*.obj,*.o,*.a,*.so,*.lib,*~,*.so,*.so.*,*.d" \
+	./erasure_code ./examples ./igzip ./include ./mem ./programs ./raid ./tests README.md SECURITY.md CONTRIBUTING.md \
+	Makefile.unx Makefile.nmake Release_notes.txt LICENSE $(CS_EXTRA_OPTS)
 
