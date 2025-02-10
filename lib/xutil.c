@@ -9,13 +9,14 @@ unsigned long long int read64(const void *p){
 	return x[0]|(x[1]<<8)|(x[2]<<16)|((unsigned int)x[3]<<24)|( (unsigned long long int)(x[4]|(x[5]<<8)|(x[6]<<16)|((unsigned int)x[7]<<24)) <<32);
 }
 
-#if 0
+//#if 0
 //write32 is now defined in lzmasdk.c.
+//now static there.
 unsigned int read32(const void *p){
 	const unsigned char *x=(const unsigned char*)p;
 	return x[0]|(x[1]<<8)|(x[2]<<16)|((unsigned int)x[3]<<24);
 }
-#endif
+//#endif
 
 unsigned int read24(const void *p){
 	const unsigned char *x=(const unsigned char*)p;
@@ -33,13 +34,14 @@ void write64(void *p, const unsigned long long int n){
 	x[4]=(n>>32)&0xff,x[5]=(n>>40)&0xff,x[6]=(n>>48)&0xff,x[7]=(n>>56)&0xff;
 }
 
-#if 0
+//#if 0
 //write32 is now defined in lzmasdk.c.
+//now static there.
 void write32(void *p, const unsigned int n){
 	unsigned char *x=(unsigned char*)p;
 	x[0]=n&0xff,x[1]=(n>>8)&0xff,x[2]=(n>>16)&0xff,x[3]=(n>>24)&0xff;
 }
-#endif
+//#endif
 
 void write24(void *p, const unsigned int n){
 	unsigned char *x=(unsigned char*)p;

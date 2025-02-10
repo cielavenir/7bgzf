@@ -29,7 +29,9 @@ typedef int (*tClose)(void *);
 	#else
 		#define LZMA_UNUSED __attribute__((unused))
 	#endif
-	#define LZMAIUnknownIMP HRESULT (WINAPI*QueryInterface)(void*, const GUID*, void**);u32 (WINAPI*AddRef)(void*);u32 (WINAPI*Release)(void*);
+	#define LZMAIUnknownIMP22 HRESULT (WINAPI*QueryInterface)(void*, const GUID*, void**);u32 (WINAPI*AddRef)(void*);u32 (WINAPI*Release)(void*);
+	#define LZMAIUnknownIMP23 HRESULT (WINAPI*QueryInterface)(void*, const GUID*, void**);u32 (WINAPI*AddRef)(void*);u32 (WINAPI*Release)(void*);
+	// #define LZMAIUnknownIMP LZMAIUnknownIMP23
 #else
 	#include "lzma_windows.h"
 	#define LZMA_UNUSED __attribute__((unused))
@@ -40,7 +42,13 @@ typedef int (*tClose)(void *);
 	u32 SysStringLen(BSTR str);
 	// Reserved1 and Reserved2:
 	// CPP/Common/MyWindows.h (cf: https://forum.lazarus.freepascal.org/index.php/topic,42701.msg298820.html#msg298820)
-	#define LZMAIUnknownIMP HRESULT (WINAPI*QueryInterface)(void*, const GUID*, void**);u32 (WINAPI*AddRef)(void*);u32 (WINAPI*Release)(void*);void *Reserved1;void *Reserved2;
+	#define LZMAIUnknownIMP22 HRESULT (WINAPI*QueryInterface)(void*, const GUID*, void**);u32 (WINAPI*AddRef)(void*);u32 (WINAPI*Release)(void*);void *Reserved1;void *Reserved2;
+	#define LZMAIUnknownIMP23 HRESULT (WINAPI*QueryInterface)(void*, const GUID*, void**);u32 (WINAPI*AddRef)(void*);u32 (WINAPI*Release)(void*);
+	// #ifdef Z7_USE_VIRTUAL_DESTRUCTOR_IN_IUNKNOWN
+	// #define LZMAIUnknownIMP LZMAIUnknownIMP22
+	// #else
+	// #define LZMAIUnknownIMP LZMAIUnknownIMP23
+	// #endif
 #endif
 
 int lzmaOpen7z();
@@ -48,7 +56,8 @@ bool lzma7zAlive();
 int lzmaGet7zFileName(char* path, int siz);
 int lzmaClose7z();
 
-int lzmaShowInfos();
+int lzmaShowInfos(FILE *out);
+int lzmaGuessVersion();
 
 /*
 Archive API
@@ -311,280 +320,600 @@ enum
 };
 
 typedef struct{
-	LZMAIUnknownIMP
+	LZMAIUnknownIMP22
 	HRESULT (WINAPI*Read)(void* self, void *data, u32 size, u32 *processedSize);
 	HRESULT (WINAPI*Seek)(void* self, s64 offset, u32 seekOrigin, u64 *newPosition);
-} IInStream_vt;
+} IInStream22_vt;
 
 typedef struct{
-	IInStream_vt *vt;
-} IInStream_;
+	IInStream22_vt *vt;
+} IInStream22_;
 
 typedef struct{
-	LZMAIUnknownIMP
+	LZMAIUnknownIMP22
 	HRESULT (WINAPI*Write)(void* self, const void *data, u32 size, u32 *processedSize);
 	HRESULT (WINAPI*Seek)(void* self, s64 offset, u32 seekOrigin, u64 *newPosition);
 	HRESULT (WINAPI*SetSize)(void* self, u64 newSize);
-} IOutStream_vt;
+} IOutStream22_vt;
 
 typedef struct{
-	IOutStream_vt *vt;
-} IOutStream_;
+	IOutStream22_vt *vt;
+} IOutStream22_;
 
 typedef struct{
-	LZMAIUnknownIMP
+	LZMAIUnknownIMP22
 	HRESULT (WINAPI*SetRatioInfo)(void* self, const u64 *inSize, const u64 *outSize);
-} ICompressProgressInfo_vt;
+} ICompressProgressInfo22_vt;
 
 typedef struct{
-	ICompressProgressInfo_vt *vt;
-} ICompressProgressInfo_;
+	ICompressProgressInfo22_vt *vt;
+} ICompressProgressInfo22_;
 
 typedef struct{
-	LZMAIUnknownIMP
-	HRESULT (WINAPI*Code)(void* self, /*ISequentialInStream_*/IInStream_ *inStream, /*ISequentialOutStream_*/IOutStream_ *outStream, u64 *inSize, u64 *outSize, ICompressProgressInfo_ *progress);
-} ICompressCoder_vt;
+	LZMAIUnknownIMP22
+	HRESULT (WINAPI*Code)(void* self, /*ISequentialInStream22_*/IInStream22_ *inStream, /*ISequentialOutStream22_*/IOutStream22_ *outStream, u64 *inSize, u64 *outSize, ICompressProgressInfo22_ *progress);
+} ICompressCoder22_vt;
 
 typedef struct{
-	ICompressCoder_vt *vt;
-} ICompressCoder_;
+	ICompressCoder22_vt *vt;
+} ICompressCoder22_;
 
 typedef struct{
-	LZMAIUnknownIMP
+	LZMAIUnknownIMP22
 	HRESULT (WINAPI*GetNumMethods)(void* self, u32 *numMethods);
 	HRESULT (WINAPI*GetProperty)(void* self, u32 index, PROPID propID, PROPVARIANT *value);
 	HRESULT (WINAPI*CreateDecoder)(void* self, u32 index, const GUID *iid, void **coder);
 	HRESULT (WINAPI*CreateEncoder)(void* self, u32 index, const GUID *iid, void **coder);
-} ICompressCodecsInfo_vt;
+} ICompressCodecsInfo22_vt;
 
 typedef struct{
-	ICompressCodecsInfo_vt *vt;
-} ICompressCodecsInfo_;
+	ICompressCodecsInfo22_vt *vt;
+} ICompressCodecsInfo22_;
 
 typedef struct{
-	LZMAIUnknownIMP
+	LZMAIUnknownIMP22
 	HRESULT (WINAPI*SetCoderProperties)(void* self, const PROPID *propIDs, const PROPVARIANT *props, u32 numProps);
-} ICompressSetCoderProperties_vt;
+} ICompressSetCoderProperties22_vt;
 
 typedef struct{
-	ICompressSetCoderProperties_vt *vt;
-} ICompressSetCoderProperties_;
+	ICompressSetCoderProperties22_vt *vt;
+} ICompressSetCoderProperties22_;
 
 typedef struct{
-	LZMAIUnknownIMP
+	LZMAIUnknownIMP22
 	HRESULT (WINAPI*SetTotal)(void* self, const u64 *files, const u64 *bytes);
 	HRESULT (WINAPI*SetCompleted)(void* self, const u64 *files, const u64 *bytes);
-} IArchiveOpenCallback_vt;
+} IArchiveOpenCallback22_vt;
 
 typedef struct{
-	IArchiveOpenCallback_vt *vt;
-} IArchiveOpenCallback_;
+	IArchiveOpenCallback22_vt *vt;
+} IArchiveOpenCallback22_;
 
 typedef struct{
-	LZMAIUnknownIMP
+	LZMAIUnknownIMP22
 	HRESULT (WINAPI*GetProperty)(void* self, PROPID propID, PROPVARIANT *value);
-	HRESULT (WINAPI*GetStream)(void* self, const wchar_t *name, IInStream_ **inStream);
-} IArchiveOpenVolumeCallback_vt;
+	HRESULT (WINAPI*GetStream)(void* self, const wchar_t *name, IInStream22_ **inStream);
+} IArchiveOpenVolumeCallback22_vt;
 
 typedef struct{
-	IArchiveOpenVolumeCallback_vt *vt;
-} IArchiveOpenVolumeCallback_;
+	IArchiveOpenVolumeCallback22_vt *vt;
+} IArchiveOpenVolumeCallback22_;
 
 typedef struct{
-	LZMAIUnknownIMP
+	LZMAIUnknownIMP22
 	HRESULT (WINAPI*SetTotal)(void* self, u64 total);
 	HRESULT (WINAPI*SetCompleted)(void* self, const u64 *completedValue);
-	HRESULT (WINAPI*GetStream)(void* self, u32 index, /*ISequentialOutStream_*/IOutStream_ **outStream, s32 askExtractMode);
+	HRESULT (WINAPI*GetStream)(void* self, u32 index, /*ISequentialOutStream22_*/IOutStream22_ **outStream, s32 askExtractMode);
 	HRESULT (WINAPI*PrepareOperation)(void* self, s32 askExtractMode);
 	HRESULT (WINAPI*SetOperationResult)(void* self, s32 opRes);
-} IArchiveExtractCallback_vt;
+} IArchiveExtractCallback22_vt;
 
 typedef struct{
-	IArchiveExtractCallback_vt *vt;
-} IArchiveExtractCallback_;
+	IArchiveExtractCallback22_vt *vt;
+} IArchiveExtractCallback22_;
 
 typedef struct{
-	LZMAIUnknownIMP
-	HRESULT (WINAPI*Open)(void* self, IInStream_ *stream, const u64 *maxCheckStartPosition, IArchiveOpenCallback_ *openArchiveCallback);
+	LZMAIUnknownIMP22
+	HRESULT (WINAPI*Open)(void* self, IInStream22_ *stream, const u64 *maxCheckStartPosition, IArchiveOpenCallback22_ *openArchiveCallback);
 	HRESULT (WINAPI*Close)(void* self);
 	HRESULT (WINAPI*GetNumberOfItems)(void* self, u32 *numItems);
 	HRESULT (WINAPI*GetProperty)(void* self, u32 index, PROPID propID, PROPVARIANT *value);
-	HRESULT (WINAPI*Extract)(void* self, const u32* indices, u32 numItems, s32 testMode, IArchiveExtractCallback_ *extractCallback);
+	HRESULT (WINAPI*Extract)(void* self, const u32* indices, u32 numItems, s32 testMode, IArchiveExtractCallback22_ *extractCallback);
 	HRESULT (WINAPI*GetArchiveProperty)(void* self, PROPID propID, PROPVARIANT *value);
 	HRESULT (WINAPI*GetNumberOfProperties)(void* self, u32 *numProperties);
 	HRESULT (WINAPI*GetPropertyInfo)(void* self, u32 index, wchar_t **name, PROPID *propID, VARTYPE *varType);
 	HRESULT (WINAPI*GetNumberOfArchiveProperties)(void* self, u32 *numProperties);
 	HRESULT (WINAPI*GetArchivePropertyInfo)(void* self, u32 index, wchar_t **name, PROPID *propID, VARTYPE *varType);
-} IInArchive_vt;
+} IInArchive22_vt;
 
 typedef struct{
-	IInArchive_vt *vt;
-} IInArchive_;
+	IInArchive22_vt *vt;
+} IInArchive22_;
 
 typedef struct{
-	LZMAIUnknownIMP
+	LZMAIUnknownIMP22
 	HRESULT (WINAPI*SetTotal)(void* self, u64 total);
 	HRESULT (WINAPI*SetCompleted)(void* self, const u64 *completedValue);
 	HRESULT (WINAPI*GetUpdateItemInfo)(void* self, u32 index, s32 *newData, s32 *newProps, u32 *indexInArchive);
 	HRESULT (WINAPI*GetProperty)(void* self, u32 index, PROPID propID, PROPVARIANT *value);
-	HRESULT (WINAPI*GetStream)(void* self, u32 index, /*ISequentialInStream_*/IInStream_ **inStream);
+	HRESULT (WINAPI*GetStream)(void* self, u32 index, /*ISequentialInStream22_*/IInStream22_ **inStream);
 	HRESULT (WINAPI*SetOperationResult)(void* self, s32 operationResult);
-} IArchiveUpdateCallback_vt;
+} IArchiveUpdateCallback22_vt;
 
 typedef struct{
-	IArchiveUpdateCallback_vt *vt;
-} IArchiveUpdateCallback_;
+	IArchiveUpdateCallback22_vt *vt;
+} IArchiveUpdateCallback22_;
 
 typedef struct{
-	LZMAIUnknownIMP
+	LZMAIUnknownIMP22
 	HRESULT (WINAPI*SetProperties)(void* self, const wchar_t * const *names, const PROPVARIANT *values, u32 numProps);
-} ISetProperties_vt;
+} ISetProperties22_vt;
 
 typedef struct{
-	ISetProperties_vt *vt;
-} ISetProperties_;
+	ISetProperties22_vt *vt;
+} ISetProperties22_;
 
 typedef struct{
-	LZMAIUnknownIMP
+	LZMAIUnknownIMP22
 	HRESULT (WINAPI*CryptoGetTextPassword)(void* self, BSTR *password);
-} ICryptoGetTextPassword_vt;
+} ICryptoGetTextPassword22_vt;
 
 typedef struct{
-	ICryptoGetTextPassword_vt *vt;
-} ICryptoGetTextPassword_;
+	ICryptoGetTextPassword22_vt *vt;
+} ICryptoGetTextPassword22_;
 
 typedef struct{
-	LZMAIUnknownIMP
+	LZMAIUnknownIMP22
 	HRESULT (WINAPI*CryptoGetTextPassword2)(void* self, s32 *passwordIsDefined, BSTR *password);
-} ICryptoGetTextPassword2_vt;
+} ICryptoGetTextPassword222_vt;
 
 typedef struct{
-	ICryptoGetTextPassword2_vt *vt;
-} ICryptoGetTextPassword2_;
+	ICryptoGetTextPassword222_vt *vt;
+} ICryptoGetTextPassword222_;
 
 typedef struct{
-	LZMAIUnknownIMP
-	HRESULT (WINAPI*UpdateItems)(void* self, /*ISequentialOutStream_*/IOutStream_ *outStream, u32 numItems, IArchiveUpdateCallback_ *updateCallback);
+	LZMAIUnknownIMP22
+	HRESULT (WINAPI*UpdateItems)(void* self, /*ISequentialOutStream22_*/IOutStream22_ *outStream, u32 numItems, IArchiveUpdateCallback22_ *updateCallback);
 	HRESULT (WINAPI*GetFileTimeType)(void* self, u32 *type);
-} IOutArchive_vt;
+} IOutArchive22_vt;
 
 typedef struct{
-	IOutArchive_vt *vt;
-} IOutArchive_;
+	IOutArchive22_vt *vt;
+} IOutArchive22_;
+
+typedef struct{
+	LZMAIUnknownIMP22
+	void    (WINAPI*Init)(void *self);
+	void    (WINAPI*Update)(void *self, const void *data, u32 size);
+	void    (WINAPI*Final)(void *self, u8 *digest);
+	u32     (WINAPI*GetDigestSize)(void *self);
+} IHasher22_vt;
+
+typedef struct{
+	IHasher22_vt *vt;
+} IHasher22_;
+
+typedef struct{
+	LZMAIUnknownIMP22
+	u32     (WINAPI*GetNumHashers)(void *self);
+	HRESULT (WINAPI*GetHasherProp)(void* self, u32 index, PROPID propID, PROPVARIANT *value);
+	HRESULT (WINAPI*CreateHasher)(void* self, u32 index, IHasher22_ **hasher);
+} IHashers22_vt;
+
+typedef struct{
+	IHashers22_vt *vt;
+} IHashers22_;
+
+typedef struct{
+	LZMAIUnknownIMP23
+	HRESULT (WINAPI*Read)(void* self, void *data, u32 size, u32 *processedSize);
+	HRESULT (WINAPI*Seek)(void* self, s64 offset, u32 seekOrigin, u64 *newPosition);
+} IInStream23_vt;
+
+typedef struct{
+	IInStream23_vt *vt;
+} IInStream23_;
+
+typedef struct{
+	LZMAIUnknownIMP23
+	HRESULT (WINAPI*Write)(void* self, const void *data, u32 size, u32 *processedSize);
+	HRESULT (WINAPI*Seek)(void* self, s64 offset, u32 seekOrigin, u64 *newPosition);
+	HRESULT (WINAPI*SetSize)(void* self, u64 newSize);
+} IOutStream23_vt;
+
+typedef struct{
+	IOutStream23_vt *vt;
+} IOutStream23_;
+
+typedef struct{
+	LZMAIUnknownIMP23
+	HRESULT (WINAPI*SetRatioInfo)(void* self, const u64 *inSize, const u64 *outSize);
+} ICompressProgressInfo23_vt;
+
+typedef struct{
+	ICompressProgressInfo23_vt *vt;
+} ICompressProgressInfo23_;
+
+typedef struct{
+	LZMAIUnknownIMP23
+	HRESULT (WINAPI*Code)(void* self, /*ISequentialInStream23_*/IInStream23_ *inStream, /*ISequentialOutStream23_*/IOutStream23_ *outStream, u64 *inSize, u64 *outSize, ICompressProgressInfo23_ *progress);
+} ICompressCoder23_vt;
+
+typedef struct{
+	ICompressCoder23_vt *vt;
+} ICompressCoder23_;
+
+typedef struct{
+	LZMAIUnknownIMP23
+	HRESULT (WINAPI*GetNumMethods)(void* self, u32 *numMethods);
+	HRESULT (WINAPI*GetProperty)(void* self, u32 index, PROPID propID, PROPVARIANT *value);
+	HRESULT (WINAPI*CreateDecoder)(void* self, u32 index, const GUID *iid, void **coder);
+	HRESULT (WINAPI*CreateEncoder)(void* self, u32 index, const GUID *iid, void **coder);
+} ICompressCodecsInfo23_vt;
+
+typedef struct{
+	ICompressCodecsInfo23_vt *vt;
+} ICompressCodecsInfo23_;
+
+typedef struct{
+	LZMAIUnknownIMP23
+	HRESULT (WINAPI*SetCoderProperties)(void* self, const PROPID *propIDs, const PROPVARIANT *props, u32 numProps);
+} ICompressSetCoderProperties23_vt;
+
+typedef struct{
+	ICompressSetCoderProperties23_vt *vt;
+} ICompressSetCoderProperties23_;
+
+typedef struct{
+	LZMAIUnknownIMP23
+	HRESULT (WINAPI*SetTotal)(void* self, const u64 *files, const u64 *bytes);
+	HRESULT (WINAPI*SetCompleted)(void* self, const u64 *files, const u64 *bytes);
+} IArchiveOpenCallback23_vt;
+
+typedef struct{
+	IArchiveOpenCallback23_vt *vt;
+} IArchiveOpenCallback23_;
+
+typedef struct{
+	LZMAIUnknownIMP23
+	HRESULT (WINAPI*GetProperty)(void* self, PROPID propID, PROPVARIANT *value);
+	HRESULT (WINAPI*GetStream)(void* self, const wchar_t *name, IInStream23_ **inStream);
+} IArchiveOpenVolumeCallback23_vt;
+
+typedef struct{
+	IArchiveOpenVolumeCallback23_vt *vt;
+} IArchiveOpenVolumeCallback23_;
+
+typedef struct{
+	LZMAIUnknownIMP23
+	HRESULT (WINAPI*SetTotal)(void* self, u64 total);
+	HRESULT (WINAPI*SetCompleted)(void* self, const u64 *completedValue);
+	HRESULT (WINAPI*GetStream)(void* self, u32 index, /*ISequentialOutStream23_*/IOutStream23_ **outStream, s32 askExtractMode);
+	HRESULT (WINAPI*PrepareOperation)(void* self, s32 askExtractMode);
+	HRESULT (WINAPI*SetOperationResult)(void* self, s32 opRes);
+} IArchiveExtractCallback23_vt;
+
+typedef struct{
+	IArchiveExtractCallback23_vt *vt;
+} IArchiveExtractCallback23_;
+
+typedef struct{
+	LZMAIUnknownIMP23
+	HRESULT (WINAPI*Open)(void* self, IInStream23_ *stream, const u64 *maxCheckStartPosition, IArchiveOpenCallback23_ *openArchiveCallback);
+	HRESULT (WINAPI*Close)(void* self);
+	HRESULT (WINAPI*GetNumberOfItems)(void* self, u32 *numItems);
+	HRESULT (WINAPI*GetProperty)(void* self, u32 index, PROPID propID, PROPVARIANT *value);
+	HRESULT (WINAPI*Extract)(void* self, const u32* indices, u32 numItems, s32 testMode, IArchiveExtractCallback23_ *extractCallback);
+	HRESULT (WINAPI*GetArchiveProperty)(void* self, PROPID propID, PROPVARIANT *value);
+	HRESULT (WINAPI*GetNumberOfProperties)(void* self, u32 *numProperties);
+	HRESULT (WINAPI*GetPropertyInfo)(void* self, u32 index, wchar_t **name, PROPID *propID, VARTYPE *varType);
+	HRESULT (WINAPI*GetNumberOfArchiveProperties)(void* self, u32 *numProperties);
+	HRESULT (WINAPI*GetArchivePropertyInfo)(void* self, u32 index, wchar_t **name, PROPID *propID, VARTYPE *varType);
+} IInArchive23_vt;
+
+typedef struct{
+	IInArchive23_vt *vt;
+} IInArchive23_;
+
+typedef struct{
+	LZMAIUnknownIMP23
+	HRESULT (WINAPI*SetTotal)(void* self, u64 total);
+	HRESULT (WINAPI*SetCompleted)(void* self, const u64 *completedValue);
+	HRESULT (WINAPI*GetUpdateItemInfo)(void* self, u32 index, s32 *newData, s32 *newProps, u32 *indexInArchive);
+	HRESULT (WINAPI*GetProperty)(void* self, u32 index, PROPID propID, PROPVARIANT *value);
+	HRESULT (WINAPI*GetStream)(void* self, u32 index, /*ISequentialInStream23_*/IInStream23_ **inStream);
+	HRESULT (WINAPI*SetOperationResult)(void* self, s32 operationResult);
+} IArchiveUpdateCallback23_vt;
+
+typedef struct{
+	IArchiveUpdateCallback23_vt *vt;
+} IArchiveUpdateCallback23_;
+
+typedef struct{
+	LZMAIUnknownIMP23
+	HRESULT (WINAPI*SetProperties)(void* self, const wchar_t * const *names, const PROPVARIANT *values, u32 numProps);
+} ISetProperties23_vt;
+
+typedef struct{
+	ISetProperties23_vt *vt;
+} ISetProperties23_;
+
+typedef struct{
+	LZMAIUnknownIMP23
+	HRESULT (WINAPI*CryptoGetTextPassword)(void* self, BSTR *password);
+} ICryptoGetTextPassword23_vt;
+
+typedef struct{
+	ICryptoGetTextPassword23_vt *vt;
+} ICryptoGetTextPassword23_;
+
+typedef struct{
+	LZMAIUnknownIMP23
+	HRESULT (WINAPI*CryptoGetTextPassword2)(void* self, s32 *passwordIsDefined, BSTR *password);
+} ICryptoGetTextPassword223_vt;
+
+typedef struct{
+	ICryptoGetTextPassword223_vt *vt;
+} ICryptoGetTextPassword223_;
+
+typedef struct{
+	LZMAIUnknownIMP23
+	HRESULT (WINAPI*UpdateItems)(void* self, /*ISequentialOutStream23_*/IOutStream23_ *outStream, u32 numItems, IArchiveUpdateCallback23_ *updateCallback);
+	HRESULT (WINAPI*GetFileTimeType)(void* self, u32 *type);
+} IOutArchive23_vt;
+
+typedef struct{
+	IOutArchive23_vt *vt;
+} IOutArchive23_;
+
+typedef struct{
+	LZMAIUnknownIMP23
+	void    (WINAPI*Init)(void *self);
+	void    (WINAPI*Update)(void *self, const void *data, u32 size);
+	void    (WINAPI*Final)(void *self, u8 *digest);
+	u32     (WINAPI*GetDigestSize)(void *self);
+} IHasher23_vt;
+
+typedef struct{
+	IHasher23_vt *vt;
+} IHasher23_;
+
+typedef struct{
+	LZMAIUnknownIMP23
+	u32     (WINAPI*GetNumHashers)(void *self);
+	HRESULT (WINAPI*GetHasherProp)(void* self, u32 index, PROPID propID, PROPVARIANT *value);
+	HRESULT (WINAPI*CreateHasher)(void* self, u32 index, IHasher23_ **hasher);
+} IHashers23_vt;
+
+typedef struct{
+	IHashers23_vt *vt;
+} IHashers23_;
 
 /// Some special derivatives ///
 
 typedef struct{
-	IInStream_vt *vt;
+	IInStream22_vt *vt;
 	u32 refs;
 	FILE *f;
-} SInStreamFile;
+} SInStreamFile22;
 
-bool WINAPI MakeSInStreamFile(SInStreamFile *self, const char *fname);
+bool WINAPI MakeSInStreamFile22(SInStreamFile22 *self, const char *fname);
 
 typedef struct{
-	IInStream_vt *vt;
+	IInStream22_vt *vt;
 	u32 refs;
 	memstream *m;
-} SInStreamMem;
+} SInStreamMem22;
 
-bool MakeSInStreamMem(SInStreamMem *self, void *p, const unsigned int size);
+bool MakeSInStreamMem22(SInStreamMem22 *self, void *p, const unsigned int size);
 
 typedef struct{
-	IInStream_vt *vt;
+	IInStream22_vt *vt;
 	u32 refs;
 	void *h;
 	tRead pRead;
 	tClose pClose;
 	tSeek pSeek;
 	tTell pTell;
-} SInStreamGeneric;
+} SInStreamGeneric22;
 
-bool MakeSInStreamGeneric(SInStreamGeneric *self, void *h, tRead pRead, tClose pClose, tSeek pSeek, tTell pTell);
+bool MakeSInStreamGeneric22(SInStreamGeneric22 *self, void *h, tRead pRead, tClose pClose, tSeek pSeek, tTell pTell);
 
 typedef struct{
-	IOutStream_vt *vt;
+	IOutStream22_vt *vt;
 	u32 refs;
 	FILE *f;
-} SOutStreamFile;
+} SOutStreamFile22;
 
-bool MakeSOutStreamFile(SOutStreamFile *self, const char *fname, bool readable);
+bool MakeSOutStreamFile22(SOutStreamFile22 *self, const char *fname, bool readable);
 
 typedef struct{
-	IOutStream_vt *vt;
+	IOutStream22_vt *vt;
 	u32 refs;
 	memstream *m;
-} SSequentialOutStreamMem;
+} SSequentialOutStreamMem22;
 
-bool MakeSSequentialOutStreamMem(SSequentialOutStreamMem *self, void *p, const unsigned int size);
+bool MakeSSequentialOutStreamMem22(SSequentialOutStreamMem22 *self, void *p, const unsigned int size);
 
 typedef struct{
-	IOutStream_vt *vt;
+	IOutStream22_vt *vt;
 	u32 refs;
 	void *h;
 	tWrite pWrite;
 	tClose pClose;
-} SSequentialOutStreamGeneric;
+} SSequentialOutStreamGeneric22;
 
-bool MakeSSequentialOutStreamGeneric(SSequentialOutStreamGeneric *self, void *h, tWrite pWrite, tClose pClose);
+bool MakeSSequentialOutStreamGeneric22(SSequentialOutStreamGeneric22 *self, void *h, tWrite pWrite, tClose pClose);
 
 typedef struct{
-	ICryptoGetTextPassword_vt *vt;
+	ICryptoGetTextPassword22_vt *vt;
 	u32 refs;
 	char *password;
-} SCryptoGetTextPasswordFixed;
+} SCryptoGetTextPasswordFixed22;
 
 //password can be null
-bool MakeSCryptoGetTextPasswordFixed(SCryptoGetTextPasswordFixed *self, const char *password);
+bool MakeSCryptoGetTextPasswordFixed22(SCryptoGetTextPasswordFixed22 *self, const char *password);
 
 typedef struct{
-	ICryptoGetTextPassword2_vt *vt;
+	ICryptoGetTextPassword222_vt *vt;
 	u32 refs;
 	char *password;
-} SCryptoGetTextPassword2Fixed;
+} SCryptoGetTextPassword2Fixed22;
 
 //password can be null
-bool MakeSCryptoGetTextPassword2Fixed(SCryptoGetTextPassword2Fixed *self, const char *password);
+bool MakeSCryptoGetTextPassword2Fixed22(SCryptoGetTextPassword2Fixed22 *self, const char *password);
 
 typedef struct{
-	IArchiveOpenVolumeCallback_vt *vt;
+	IArchiveOpenVolumeCallback22_vt *vt;
 	u32 refs;
 	char *fname;
-} SArchiveOpenVolumeCallback;
+} SArchiveOpenVolumeCallback22;
 
 //fname can be null
-bool MakeSArchiveOpenVolumeCallback(SArchiveOpenVolumeCallback *self, const char *fname);
+bool MakeSArchiveOpenVolumeCallback22(SArchiveOpenVolumeCallback22 *self, const char *fname);
 
 typedef struct{
-	IArchiveOpenCallback_vt *vt;
+	IArchiveOpenCallback22_vt *vt;
 	u32 refs;
-	SCryptoGetTextPasswordFixed setpassword;
-	SArchiveOpenVolumeCallback openvolume;
-} SArchiveOpenCallbackPassword;
+	SCryptoGetTextPasswordFixed22 setpassword;
+	SArchiveOpenVolumeCallback22 openvolume;
+} SArchiveOpenCallbackPassword22;
 
 //password/fname can be null
-bool MakeSArchiveOpenCallbackPassword(SArchiveOpenCallbackPassword *self, const char *password, const char *fname);
+bool MakeSArchiveOpenCallbackPassword22(SArchiveOpenCallbackPassword22 *self, const char *password, const char *fname);
 
 typedef struct{
-	IArchiveExtractCallback_vt *vt;
+	IArchiveExtractCallback22_vt *vt;
 	u32 refs;
-	SCryptoGetTextPasswordFixed setpassword;
-	IInArchive_ *archiver;
+	SCryptoGetTextPasswordFixed22 setpassword;
+	IInArchive22_ *archiver;
 	u32 lastIndex;
-} SArchiveExtractCallbackBare;
+} SArchiveExtractCallbackBare22;
 
 //password can be null
-bool MakeSArchiveExtractCallbackBare(SArchiveExtractCallbackBare *self, IInArchive_ *archiver, const char *password);
+bool MakeSArchiveExtractCallbackBare22(SArchiveExtractCallbackBare22 *self, IInArchive22_ *archiver, const char *password);
 
 typedef struct{
-	IArchiveUpdateCallback_vt *vt;
+	IArchiveUpdateCallback22_vt *vt;
 	u32 refs;
-	SCryptoGetTextPassword2Fixed setpassword;
-	IOutArchive_ *archiver;
+	SCryptoGetTextPassword2Fixed22 setpassword;
+	IOutArchive22_ *archiver;
 	u32 lastIndex;
-} SArchiveUpdateCallbackBare;
+} SArchiveUpdateCallbackBare22;
 
-bool MakeSArchiveUpdateCallbackBare(SArchiveUpdateCallbackBare *self, IOutArchive_ *archiver, const char *password);
+bool MakeSArchiveUpdateCallbackBare22(SArchiveUpdateCallbackBare22 *self, IOutArchive22_ *archiver, const char *password);
+
+typedef struct{
+	IInStream23_vt *vt;
+	u32 refs;
+	FILE *f;
+} SInStreamFile23;
+
+bool WINAPI MakeSInStreamFile23(SInStreamFile23 *self, const char *fname);
+
+typedef struct{
+	IInStream23_vt *vt;
+	u32 refs;
+	memstream *m;
+} SInStreamMem23;
+
+bool MakeSInStreamMem23(SInStreamMem23 *self, void *p, const unsigned int size);
+
+typedef struct{
+	IInStream23_vt *vt;
+	u32 refs;
+	void *h;
+	tRead pRead;
+	tClose pClose;
+	tSeek pSeek;
+	tTell pTell;
+} SInStreamGeneric23;
+
+bool MakeSInStreamGeneric23(SInStreamGeneric23 *self, void *h, tRead pRead, tClose pClose, tSeek pSeek, tTell pTell);
+
+typedef struct{
+	IOutStream23_vt *vt;
+	u32 refs;
+	FILE *f;
+} SOutStreamFile23;
+
+bool MakeSOutStreamFile23(SOutStreamFile23 *self, const char *fname, bool readable);
+
+typedef struct{
+	IOutStream23_vt *vt;
+	u32 refs;
+	memstream *m;
+} SSequentialOutStreamMem23;
+
+bool MakeSSequentialOutStreamMem23(SSequentialOutStreamMem23 *self, void *p, const unsigned int size);
+
+typedef struct{
+	IOutStream23_vt *vt;
+	u32 refs;
+	void *h;
+	tWrite pWrite;
+	tClose pClose;
+} SSequentialOutStreamGeneric23;
+
+bool MakeSSequentialOutStreamGeneric23(SSequentialOutStreamGeneric23 *self, void *h, tWrite pWrite, tClose pClose);
+
+typedef struct{
+	ICryptoGetTextPassword23_vt *vt;
+	u32 refs;
+	char *password;
+} SCryptoGetTextPasswordFixed23;
+
+//password can be null
+bool MakeSCryptoGetTextPasswordFixed23(SCryptoGetTextPasswordFixed23 *self, const char *password);
+
+typedef struct{
+	ICryptoGetTextPassword223_vt *vt;
+	u32 refs;
+	char *password;
+} SCryptoGetTextPassword2Fixed23;
+
+//password can be null
+bool MakeSCryptoGetTextPassword2Fixed23(SCryptoGetTextPassword2Fixed23 *self, const char *password);
+
+typedef struct{
+	IArchiveOpenVolumeCallback23_vt *vt;
+	u32 refs;
+	char *fname;
+} SArchiveOpenVolumeCallback23;
+
+//fname can be null
+bool MakeSArchiveOpenVolumeCallback23(SArchiveOpenVolumeCallback23 *self, const char *fname);
+
+typedef struct{
+	IArchiveOpenCallback23_vt *vt;
+	u32 refs;
+	SCryptoGetTextPasswordFixed23 setpassword;
+	SArchiveOpenVolumeCallback23 openvolume;
+} SArchiveOpenCallbackPassword23;
+
+//password/fname can be null
+bool MakeSArchiveOpenCallbackPassword23(SArchiveOpenCallbackPassword23 *self, const char *password, const char *fname);
+
+typedef struct{
+	IArchiveExtractCallback23_vt *vt;
+	u32 refs;
+	SCryptoGetTextPasswordFixed23 setpassword;
+	IInArchive23_ *archiver;
+	u32 lastIndex;
+} SArchiveExtractCallbackBare23;
+
+//password can be null
+bool MakeSArchiveExtractCallbackBare23(SArchiveExtractCallbackBare23 *self, IInArchive23_ *archiver, const char *password);
+
+typedef struct{
+	IArchiveUpdateCallback23_vt *vt;
+	u32 refs;
+	SCryptoGetTextPassword2Fixed23 setpassword;
+	IOutArchive23_ *archiver;
+	u32 lastIndex;
+} SArchiveUpdateCallbackBare23;
+
+bool MakeSArchiveUpdateCallbackBare23(SArchiveUpdateCallbackBare23 *self, IOutArchive23_ *archiver, const char *password);
 
 int lzmaLoadExternalCodecs();
 int lzmaUnloadExternalCodecs();
