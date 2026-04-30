@@ -51,10 +51,12 @@ typedef long long s64;
 	#include <windows.h>
 	#include <fcntl.h>
 	#include <io.h>
+	#include <process.h>
 	#define sleep(t) Sleep(1000*(t))
 	#define initstdio() setmode(fileno(stdin),O_BINARY),setmode(fileno(stdout),O_BINARY),setmode(fileno(stderr),O_BINARY);
 	//bah, msvcrt.a is obsolete...?
 	#define filelengthi64(f) filelength(f)
+	int ftruncate(int, _off_t);
 
 	#define OPEN_BINARY O_BINARY
 	//because of nasty msvcrt

@@ -264,7 +264,7 @@ static int _compress(FILE *fin,FILE *fout,int level,int method){
 			return 1;
 		}
 #if defined(_WIN32) || (!defined(__GNUC__) && !defined(__clang__))
-		HANDLE *h = CreateFileMapping(_get_osfhandle(fileno(fin)), NULL, PAGE_READONLY, 0, 0, NULL);
+		HANDLE *h = CreateFileMapping((HANDLE)_get_osfhandle(fileno(fin)), NULL, PAGE_READONLY, 0, 0, NULL);
 		char *mem = MapViewOfFile(h, FILE_MAP_READ, 0, 0, siz);
 #else
 		char *mem = mmap(NULL, siz, PROT_READ, MAP_PRIVATE, fileno(fin), 0);
@@ -313,7 +313,7 @@ static int _compress(FILE *fin,FILE *fout,int level,int method){
 			return 1;
 		}
 #if defined(_WIN32) || (!defined(__GNUC__) && !defined(__clang__))
-		HANDLE *h = CreateFileMapping(_get_osfhandle(fileno(fin)), NULL, PAGE_READONLY, 0, 0, NULL);
+		HANDLE *h = CreateFileMapping((HANDLE)_get_osfhandle(fileno(fin)), NULL, PAGE_READONLY, 0, 0, NULL);
 		char *mem = MapViewOfFile(h, FILE_MAP_READ, 0, 0, siz);
 #else
 		char *mem = mmap(NULL, siz, PROT_READ, MAP_PRIVATE, fileno(fin), 0);
@@ -362,7 +362,7 @@ static int _compress(FILE *fin,FILE *fout,int level,int method){
 			return 1;
 		}
 #if defined(_WIN32) || (!defined(__GNUC__) && !defined(__clang__))
-		HANDLE *h = CreateFileMapping(_get_osfhandle(fileno(fin)), NULL, PAGE_READONLY, 0, 0, NULL);
+		HANDLE *h = CreateFileMapping((HANDLE)_get_osfhandle(fileno(fin)), NULL, PAGE_READONLY, 0, 0, NULL);
 		char *mem = MapViewOfFile(h, FILE_MAP_READ, 0, 0, siz);
 #else
 		char *mem = mmap(NULL, siz, PROT_READ, MAP_PRIVATE, fileno(fin), 0);

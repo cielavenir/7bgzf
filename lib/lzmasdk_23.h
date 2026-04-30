@@ -4,18 +4,23 @@ static int lzmaShowInfos(FILE *out){
 	char strbuf[768];
 
 	lzmaGet7zFileName(strbuf, 768);
-	fprintf(out,"7-zip implementation: %s (guessed version: %04d (or newer))\n\n", strbuf, guessed7zVersion);
+	if(retrieved7zVersion != -1){
+		fprintf(out,"7-zip implementation: %s (version: %04d)\n\n", strbuf, retrieved7zVersion);
+	} else {
+		fprintf(out,"7-zip implementation: %s (guessed version: %04d (or newer))\n\n", strbuf, guessed7zVersion);
+	}
 
 	fprintf(out, "Formats:\n");
 	u32 numFormats;
 	pGetNumFormats(&numFormats);
 	for(u32 i=0;i<numFormats;i++){
 		PROPVARIANT value;
+		value.vt = VT_BSTR;
+		value.bstrVal = SysAllocStringLen(NULL, 768);
 		pGetHandlerProperty2(i, NHandlerPropID_kName, &value);
 		wcstombs(strbuf, value.bstrVal, 768);
 		fprintf(out, "%s\t", strbuf);
 		if(strlen(strbuf)<8)fputc('\t', out);
-		// PropVariantClear(&value); // cleared externally
 		pGetHandlerProperty2(i, NHandlerPropID_kClassID, &value);
 		fprintf(out, "%d (0x%02x)\t", ((u8*)value.bstrVal)[13], ((u8*)value.bstrVal)[13]);
 		pGetHandlerProperty2(i, NHandlerPropID_kUpdate, &value);
@@ -30,6 +35,7 @@ static int lzmaShowInfos(FILE *out){
 		//wcstombs(strbuf, value.bstrVal, 768);
 		//fprintf(out, "\t%s", strbuf);
 		fprintf(out, "\n");
+		PropVariantClear(&value);
 	}
 
 	fprintf(out, "Codecs:\n");
@@ -37,6 +43,8 @@ static int lzmaShowInfos(FILE *out){
 	pGetNumMethods(&numMethods);
 	for(u32 i=0;i<numMethods;i++){
 		PROPVARIANT value;
+		value.vt = VT_BSTR;
+		value.bstrVal = SysAllocStringLen(NULL, 768);
 		pGetMethodProperty(i, NMethodPropID_kName, &value);
 		wcstombs(strbuf, value.bstrVal, 768);
 		fprintf(out, "%s\t", strbuf);
@@ -55,11 +63,14 @@ static int lzmaShowInfos(FILE *out){
 		//	fprintf(out, "\t%s", strbuf);
 		//}
 		fprintf(out, "\n");
+		PropVariantClear(&value);
 	}
 	if(scoder.vt){
 		SCompressCodecsInfoExternal_GetNumMethods(&scoder, &numMethods);
 		for(u32 i=0;i<numMethods;i++){
 			PROPVARIANT value;
+			value.vt = VT_BSTR;
+			value.bstrVal = SysAllocStringLen(NULL, 768);
 			SCompressCodecsInfoExternal_GetProperty(&scoder, i, NMethodPropID_kName, &value);
 			wcstombs(strbuf, value.bstrVal, 768);
 			fprintf(out, "%s\t", strbuf);
@@ -73,6 +84,7 @@ static int lzmaShowInfos(FILE *out){
 			HRESULT r = SCompressCodecsInfoExternal_GetProperty(&scoder, i, NMethodPropID_kIsFilter, &value);
 			fputc(r ? '*' : value.boolVal ? 'F' : '-', out);
 			fprintf(out, "\n");
+			PropVariantClear(&value);
 		}
 	}
 
@@ -82,6 +94,8 @@ static int lzmaShowInfos(FILE *out){
 	u32 numHashers = hashers->vt->GetNumHashers(hashers);
 	for(u32 i=0;i<numHashers;i++){
 		PROPVARIANT value;
+		value.vt = VT_BSTR;
+		value.bstrVal = SysAllocStringLen(NULL, 768);
 		hashers->vt->GetHasherProp(hashers, i, NMethodPropID_kName, &value);
 		wcstombs(strbuf, value.bstrVal, 768);
 		fprintf(out, "%s\t", strbuf);
@@ -96,8 +110,10 @@ static int lzmaShowInfos(FILE *out){
 		//	fprintf(out, "\t%s", strbuf);
 		//}
 		fprintf(out, "\n");
+		PropVariantClear(&value);
 	}
 	hashers->vt->Release(hashers);
+	// todo: can call GetHashers for external hashers in exactly the same way.
 
 	return 0;
 }

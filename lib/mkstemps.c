@@ -2,6 +2,7 @@
 
 #if defined(_WIN32) || (!defined(__GNUC__) && !defined(__clang__))
 #include <string.h>
+#include <stdlib.h>
 #include <errno.h>
 #include <sys/stat.h>
 

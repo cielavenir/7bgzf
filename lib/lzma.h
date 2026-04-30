@@ -57,6 +57,7 @@ int lzmaGet7zFileName(char* path, int siz);
 int lzmaClose7z();
 
 int lzmaShowInfos(FILE *out);
+int lzmaGetVersion();
 int lzmaGuessVersion();
 
 /*
@@ -183,6 +184,8 @@ enum{
 	NCoderPropID_kFilter,            // VT_BSTR
 	NCoderPropID_kMemUse,            // VT_UI8
 	NCoderPropID_kAffinity,          // VT_UI8
+	NCoderPropID_kBranchOffset,      // VT_UI4
+	NCoderPropID_kHashBits,          // VT_UI4
 };
 
 enum{
@@ -199,6 +202,16 @@ enum{
 	NMethodPropID_kIsFilter,
 };
 
+enum{
+	NModuleInterfaceType_k_IUnknown_VirtDestructor_No = 0,
+	NModuleInterfaceType_k_IUnknown_VirtDestructor_Yes = 1,
+};
+
+enum{
+	NModulePropID_kInterfaceType = 0,   // VT_UI4
+	NModulePropID_kVersion,             // VT_UI4
+};
+
 // NArchive
 enum{
 	NHandlerPropID_kName = 0,        // VT_BSTR
@@ -213,6 +226,7 @@ enum{
 	NHandlerPropID_kAltStreams,      // VT_BOOL
 	NHandlerPropID_kNtSecure,        // VT_BOOL
 	NHandlerPropID_kFlags,           // VT_UI4
+	NHandlerPropID_kTimeFlags,       // VT_UI4
 };
 
 enum
@@ -313,6 +327,15 @@ enum
 	kpidReadOnly,
 	kpidOutName,
 	kpidCopyLink,
+	kpidArcFileName,
+	kpidIsHash,
+	kpidChangeTime,
+	kpidUserId,
+	kpidGroupId,
+	kpidDeviceMajor,
+	kpidDeviceMinor,
+	kpidDevMajor,
+	kpidDevMinor,
 
 	kpid_NUM_DEFINED,
 

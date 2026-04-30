@@ -15,7 +15,11 @@
 #include <wchar.h>
 #endif
 
-#define MAKE(STRUCT_NAME, ...) Make ## __VA_ARGS__ ## STRUCT_NAME
+#if defined(_WIN32) || (!defined(__GNUC__) && !defined(__clang__))
+	#define wcscasecmp wcsicmp
+#endif
+
+// #define MAKE(STRUCT_NAME, ...) Make ## __VA_ARGS__ ## STRUCT_NAME
 
 #ifdef __cplusplus
 extern "C"{
@@ -61,6 +65,7 @@ EXTERN const IID IID_ISetProperties_={0x23170F69,0x40C1,0x278A,{0x00,0x00,0x00,0
 
 static int lzmaGetArchiveFileProperty22(void *archiver,unsigned int index,int kpid,PROPVARIANT *prop);
 static int lzmaGetArchiveFileProperty23(void *archiver,unsigned int index,int kpid,PROPVARIANT *prop);
+static int _lzmaGetVersion();
 static int _lzmaGuessVersion();
 
 static HRESULT WINAPI SInStreamFile22_QueryInterface(void* _self, const GUID* iid, void** out_obj){
@@ -1252,6 +1257,9 @@ static funcGetNumFormats pGetNumFormats;
 typedef HRESULT (WINAPI*funcGetProperty)(u32 index, PROPID propID, PROPVARIANT *value);
 static funcGetProperty pGetMethodProperty;
 static funcGetProperty pGetHandlerProperty2;
+typedef HRESULT (WINAPI*funcGetModuleProp)(PROPID propID, PROPVARIANT *value);
+static funcGetModuleProp pGetModuleProp;
+
 typedef HRESULT (WINAPI*funcCreateEncoder)(u32 index, const GUID *iid, void **coder);
 typedef HRESULT (WINAPI*funcCreateDecoder)(u32 index, const GUID *iid, void **coder);
 
@@ -1263,6 +1271,7 @@ typedef HRESULT (WINAPI*funcCreateDecoder)(u32 index, const GUID *iid, void **co
 #endif
 
 static HMODULE h7z=NULL;
+static int retrieved7zVersion = 0;
 static int guessed7zVersion = 0;
 
 typedef struct{
@@ -1382,6 +1391,7 @@ int lzmaOpen7z(){
 	pGetNumMethods=(funcGetNumMethods)GetProcAddress(h7z,"GetNumberOfMethods");
 	pGetHandlerProperty2 = (funcGetProperty)GetProcAddress(h7z,"GetHandlerProperty2");
 	pGetMethodProperty = (funcGetProperty)GetProcAddress(h7z,"GetMethodProperty");
+	pGetModuleProp = (funcGetModuleProp)GetProcAddress(h7z,"GetModuleProp");
 #endif
 	if(!lzma7zAlive()){
 #ifndef NODLOPEN
@@ -1391,7 +1401,12 @@ int lzmaOpen7z(){
 		return 2;
 	}
 
-	guessed7zVersion = _lzmaGuessVersion();
+	retrieved7zVersion = _lzmaGetVersion();
+	if(retrieved7zVersion != -1){
+		guessed7zVersion = retrieved7zVersion;
+	} else {
+		guessed7zVersion = _lzmaGuessVersion();
+	}
 
 	return 0; //now you can call 7z.so.
 }
@@ -1416,11 +1431,54 @@ int lzmaClose7z(){
 	return 0;
 }
 
+static int _lzmaGetVersion(){
+	if(!h7z)return -1;
+
+	if(pGetModuleProp){
+		// from v23, it seems like version can be retrieved
+		PROPVARIANT value;
+		pGetModuleProp(NModulePropID_kVersion, &value);
+		return (value.uintVal & 0xff) + (value.uintVal >> 16) * 100;
+	}
+	return -1;
+}
+
+#if 0
+static int _lzmaGetABI(){ // todo concrete interface
+	if(!h7z)return -1;
+
+	if(!pGetModuleProp){
+		// if GetModuleProp is not exposed, it is v22
+		return 22;
+	}
+
+	{
+		PROPVARIANT value;
+		pGetModuleProp(NModulePropID_kInterfaceType, &value);
+		if(value.uintVal == NModuleInterfaceType_k_IUnknown_VirtDestructor_No){
+			return 23;
+		}else if(value.uintVal == NModuleInterfaceType_k_IUnknown_VirtDestructor_Yes){
+			return 22;
+		}
+	}
+	return -1;
+}
+#endif
+
+int lzmaGetVersion(){
+	return retrieved7zVersion;
+}
+
 static int _lzmaGuessVersion(){
 	if(!h7z)return -1;
 	int ret = 0;
 
+	// until v22, 7z.so does not provide version API.
+	// As a workaround, we query formats and methods.
+	// This is required to select different ABI (on macOS/Linux) for 23.00 or later.
+
 	// hasher 0x00000231 (SHA3-256) 2409
+	// unfortunately querying hasher requires vt (virtual method table), hence cannot be used for probing version.
 
 	u32 numMethods;
 	pGetNumMethods(&numMethods);
@@ -1441,15 +1499,21 @@ static int _lzmaGuessVersion(){
 		if(id == 0x06)ret=max32(ret, 426); // lzh
 		if(id == 0x09)ret=max32(ret, 442); // nsis
 		if(id == 0x0c)ret=max32(ret, 904); // xz
-		if(id == 0x0e && ret >= 2300)ret=max32(ret,2401); // zstd // recognize zstd as flag only when arm64 is set
+		if(id == 0x0e && ret >= 2300)ret=max32(ret,2401); // zstd, but recognize only when arm64 is set as it could be p7zip extention
 		if(id == 0xbf)ret=max32(ret,2405); // lvm
 		if(id == 0xc3)ret=max32(ret,2200); // apfs
 		if(id == 0xc4)ret=max32(ret,2107); // vhdx
 		if(id == 0xc5)ret=max32(ret,1902); // base64
-		if(id == 0xc6)ret=max32(ret,1800); // coff
+		if(id == 0xc6){
+			// coff, but recognize only when kName is correct
+			pGetHandlerProperty2(i, NHandlerPropID_kName, &value);
+			if(!wcscasecmp(value.bstrVal,L"COFF")){
+				ret=max32(ret,1800);
+			}
+		}
 		if(id == 0xc7)ret=max32(ret,1508); // ext4
 		if(id == 0xc8)ret=max32(ret,1507); // vmdk
-		if(id == 0xcc)ret=max32(ret,1506); // vmdk
+		if(id == 0xcc)ret=max32(ret,1506); // rar5
 		if(id == 0xd0)ret=max32(ret, 921); // uefi
 		if(id == 0xd2)ret=max32(ret, 918); // squashfs
 		if(id == 0xd4)ret=max32(ret, 909); // apm
@@ -1509,13 +1573,13 @@ static int lzmaGUIDSetCoder(void *g,unsigned long long int codecid,int encode){
 	return 0;
 }
 
-static HRESULT SCompressCodecsInfoExternal22_QueryInterface(void* _self, const GUID* iid, void** out_obj){
+static HRESULT WINAPI SCompressCodecsInfoExternal22_QueryInterface(void* _self, const GUID* iid, void** out_obj){
 	LZMA_UNUSED SCompressCodecsInfoExternal22_ *self = (SCompressCodecsInfoExternal22_*)_self;
 	*out_obj = NULL;
 	return E_NOINTERFACE;
 }
 
-static HRESULT SCompressCodecsInfoExternal23_QueryInterface(void* _self, const GUID* iid, void** out_obj){
+static HRESULT WINAPI SCompressCodecsInfoExternal23_QueryInterface(void* _self, const GUID* iid, void** out_obj){
 	LZMA_UNUSED SCompressCodecsInfoExternal23_ *self = (SCompressCodecsInfoExternal23_*)_self;
 	*out_obj = NULL;
 	return E_NOINTERFACE;

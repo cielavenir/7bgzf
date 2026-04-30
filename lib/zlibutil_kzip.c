@@ -12,8 +12,8 @@
 
 #if defined(_WIN32) || (!defined(__GNUC__) && !defined(__clang__))
 // in C++, this MMAP/MUNMAP should be handled by subclasses...
-#define MMAPR(h, mem, fd, siz) HANDLE *h = CreateFileMapping(_get_osfhandle(fd), NULL, PAGE_READONLY, 0, 0, NULL);char *mem = MapViewOfFile(h, FILE_MAP_READ, 0, 0, siz);
-#define MMAPW(h, mem, fd, siz) HANDLE *h = CreateFileMapping(_get_osfhandle(fd), NULL, PAGE_READWRITE, 0, 0, NULL);char *mem = MapViewOfFile(h, FILE_MAP_WRITE, 0, 0, siz);
+#define MMAPR(h, mem, fd, siz) HANDLE *h = CreateFileMapping((HANDLE)_get_osfhandle(fd), NULL, PAGE_READONLY, 0, 0, NULL);char *mem = MapViewOfFile(h, FILE_MAP_READ, 0, 0, siz);
+#define MMAPW(h, mem, fd, siz) HANDLE *h = CreateFileMapping((HANDLE)_get_osfhandle(fd), NULL, PAGE_READWRITE, 0, 0, NULL);char *mem = MapViewOfFile(h, FILE_MAP_WRITE, 0, 0, siz);
 #define MUNMAP(h, mem, siz) UnmapViewOfFile(mem);CloseHandle(h);
 #include <process.h>
 // need to self-compile mkstemps on MinGW
@@ -100,7 +100,7 @@ int kzip_deflate(
 
 	char * const args[]={"kzip","-q","-y","-s0","-b256",templatezip,template,NULL};
 #if defined(_WIN32) || (!defined(__GNUC__) && !defined(__clang__))
-	if(_spawnvp(_P_WAIT, "kzip.exe", args)){
+	if(_spawnvp(_P_WAIT, "kzip.exe", (const char* const*)args)){
 		//fprintf(stderr,"aaa %d\n",errno);
 		//fprintf(stderr,"aaa %s\n",getenv("PATH"));
 		//close(fdzip);
