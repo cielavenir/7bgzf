@@ -1,6 +1,6 @@
 #!/bin/bash
-if ! type icpx >/dev/null 2>/dev/null && [ -f /opt/intel/oneapi/setvars.sh ]; then
-  . /opt/intel/oneapi/setvars.sh
+if ! type icpx >/dev/null 2>/dev/null && [ -f /opt/intel/oneapi/compiler/2023.2.2/env/vars.sh ]; then
+  . /opt/intel/oneapi/compiler/2023.2.2/env/vars.sh
 fi
 make clean
 echo "Self (icx)"
